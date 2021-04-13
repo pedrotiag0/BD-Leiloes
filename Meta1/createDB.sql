@@ -15,7 +15,7 @@ CREATE TABLE administrador (
 CREATE TABLE artigo (
 	artigoid			 VARCHAR(10),
 	nome			 VARCHAR(32) NOT NULL,
-	descricao			 VARCHAR(512),
+	descricao			 VARCHAR(512) NOT NULL,
 	vendedor_utilizador_userid BIGINT NOT NULL,
 	PRIMARY KEY(artigoid)
 );
@@ -27,6 +27,7 @@ CREATE TABLE leilao (
 	descricao			 VARCHAR(512) NOT NULL,
 	datafim			 TIMESTAMP NOT NULL,
 	cancelado			 BOOL NOT NULL DEFAULT true,
+	maiorlicitacao		 INTEGER NOT NULL,
 	vendedor_utilizador_userid BIGINT NOT NULL,
 	artigo_artigoid		 VARCHAR(10) UNIQUE NOT NULL,
 	PRIMARY KEY(leilaoid)
@@ -34,7 +35,7 @@ CREATE TABLE leilao (
 
 CREATE TABLE licitacao (
 	valor			 INTEGER NOT NULL,
-	valida			 BOOL DEFAULT true,
+	valida			 BOOL NOT NULL DEFAULT true,
 	comprador_utilizador_userid BIGINT NOT NULL,
 	leilao_leilaoid		 BIGINT NOT NULL
 );
@@ -47,13 +48,13 @@ CREATE TABLE mensagem (
 );
 
 CREATE TABLE vendedor (
-	moradaenvio	 VARCHAR(128),
+	moradaenvio	 VARCHAR(128) NOT NULL,
 	utilizador_userid BIGINT,
 	PRIMARY KEY(utilizador_userid)
 );
 
 CREATE TABLE comprador (
-	moradarececao	 VARCHAR(128),
+	moradarececao	 VARCHAR(128) NOT NULL,
 	utilizador_userid BIGINT,
 	PRIMARY KEY(utilizador_userid)
 );
