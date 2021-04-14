@@ -12,39 +12,33 @@ CREATE TABLE administrador (
 	PRIMARY KEY(utilizador_userid)
 );
 
-CREATE TABLE artigo (
+CREATE TABLE artigo_leilao (
 	artigoid			 VARCHAR(10),
 	nome			 VARCHAR(32) NOT NULL,
 	descricao			 VARCHAR(512) NOT NULL,
+	leilao_leilaoid		 BIGINT UNIQUE NOT NULL,
+	leilao_precominimo	 INTEGER NOT NULL,
+	leilao_titulo		 VARCHAR(64) NOT NULL,
+	leilao_descricao		 VARCHAR(512) NOT NULL,
+	leilao_datafim		 TIMESTAMP NOT NULL,
+	leilao_cancelado		 BOOL NOT NULL DEFAULT true,
+	leilao_maiorlicitacao	 INTEGER NOT NULL,
 	vendedor_utilizador_userid BIGINT NOT NULL,
 	PRIMARY KEY(artigoid)
-);
-
-CREATE TABLE leilao (
-	leilaoid			 BIGINT,
-	precominimo		 INTEGER NOT NULL,
-	titulo			 VARCHAR(32) NOT NULL,
-	descricao			 VARCHAR(512) NOT NULL,
-	datafim			 TIMESTAMP NOT NULL,
-	cancelado			 BOOL NOT NULL DEFAULT true,
-	maiorlicitacao		 INTEGER NOT NULL,
-	vendedor_utilizador_userid BIGINT NOT NULL,
-	artigo_artigoid		 VARCHAR(10) UNIQUE NOT NULL,
-	PRIMARY KEY(leilaoid)
 );
 
 CREATE TABLE licitacao (
 	valor			 INTEGER NOT NULL,
 	valida			 BOOL NOT NULL DEFAULT true,
 	comprador_utilizador_userid BIGINT NOT NULL,
-	leilao_leilaoid		 BIGINT NOT NULL
+	artigo_leilao_artigoid	 VARCHAR(10) NOT NULL
 );
 
 CREATE TABLE mensagem (
-	comentario	 VARCHAR(128) NOT NULL,
+	comentario		 VARCHAR(128) NOT NULL,
 	momento		 TIMESTAMP NOT NULL,
-	utilizador_userid BIGINT NOT NULL,
-	leilao_leilaoid	 BIGINT NOT NULL
+	utilizador_userid	 BIGINT NOT NULL,
+	artigo_leilao_artigoid VARCHAR(10) NOT NULL
 );
 
 CREATE TABLE vendedor (
@@ -59,14 +53,19 @@ CREATE TABLE comprador (
 	PRIMARY KEY(utilizador_userid)
 );
 
+CREATE TABLE versao (
+	titulo		 VARCHAR(64) NOT NULL,
+	descricao		 VARCHAR(512),
+	artigo_leilao_artigoid VARCHAR(10) NOT NULL
+);
+
 ALTER TABLE administrador ADD CONSTRAINT administrador_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
-ALTER TABLE artigo ADD CONSTRAINT artigo_fk1 FOREIGN KEY (vendedor_utilizador_userid) REFERENCES vendedor(utilizador_userid);
-ALTER TABLE leilao ADD CONSTRAINT leilao_fk1 FOREIGN KEY (vendedor_utilizador_userid) REFERENCES vendedor(utilizador_userid);
-ALTER TABLE leilao ADD CONSTRAINT leilao_fk2 FOREIGN KEY (artigo_artigoid) REFERENCES artigo(artigoid);
+ALTER TABLE artigo_leilao ADD CONSTRAINT artigo_leilao_fk1 FOREIGN KEY (vendedor_utilizador_userid) REFERENCES vendedor(utilizador_userid);
 ALTER TABLE licitacao ADD CONSTRAINT licitacao_fk1 FOREIGN KEY (comprador_utilizador_userid) REFERENCES comprador(utilizador_userid);
-ALTER TABLE licitacao ADD CONSTRAINT licitacao_fk2 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
+ALTER TABLE licitacao ADD CONSTRAINT licitacao_fk2 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
 ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
-ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk2 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
+ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk2 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
 ALTER TABLE vendedor ADD CONSTRAINT vendedor_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 ALTER TABLE comprador ADD CONSTRAINT comprador_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
+ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
 
