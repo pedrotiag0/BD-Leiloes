@@ -12,9 +12,9 @@ def hello():
     <br/>
     Trabalho realizado por:<br/>
     <br/>
-    Diogo Filipe    | <uc2018288391@student.uc.pt><br/>
-    José Gomes      | <uc2018286225@student.uc.pt><br/>
-    Pedro Marques   | <uc2018285632@student.uc.pt><br/>
+    Diogo Filipe    | uc2018288391@student.uc.pt<br/>
+    José Gomes      | uc2018286225@student.uc.pt<br/>
+    Pedro Marques   | uc2018285632@student.uc.pt<br/>
     <br/>
     """
 
@@ -59,7 +59,14 @@ def addUser():
 
     return jsonify(result)
 
-
+def db_connection():
+    db = psycopg2.connect(user = "aulaspl",
+                            password = "aulaspl",
+                            host = "db",
+                            port = "5432",
+                            database = "bdLeiloes")
+    return db
+	
 if __name__ == "__main__":
     # Set up the logging
     logging.basicConfig(filename="logs/log_file.log")
