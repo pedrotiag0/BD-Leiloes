@@ -1,5 +1,5 @@
 CREATE TABLE utilizador (
-	userid	 SERIAL,
+	userid	 BIGINT,
 	username	 VARCHAR(32) UNIQUE NOT NULL,
 	email	 VARCHAR(64) UNIQUE NOT NULL,
 	password	 VARCHAR(32) NOT NULL,
@@ -14,12 +14,12 @@ CREATE TABLE administrador (
 
 CREATE TABLE artigo_leilao (
 	artigoid			 VARCHAR(10),
-	nome			 VARCHAR(32) NOT NULL,
-	descricao			 VARCHAR(512) NOT NULL,
+	nomeartigo		 VARCHAR(32) NOT NULL,
+	descricaoartigo		 VARCHAR(512) NOT NULL,
 	leilao_leilaoid		 BIGINT UNIQUE NOT NULL,
 	leilao_precominimo	 INTEGER NOT NULL,
-	leilao_titulo		 VARCHAR(64) NOT NULL,
-	leilao_descricao		 VARCHAR(512) NOT NULL,
+	leilao_tituloleilao	 VARCHAR(64) NOT NULL,
+	leilao_descricaoleilao	 VARCHAR(512) NOT NULL,
 	leilao_datafim		 TIMESTAMP NOT NULL,
 	leilao_maiorlicitacao	 INTEGER NOT NULL,
 	leilao_admincancelou	 BIGINT,
@@ -56,7 +56,9 @@ CREATE TABLE comprador (
 CREATE TABLE versao (
 	titulo		 VARCHAR(64) NOT NULL,
 	descricao		 VARCHAR(512),
-	artigo_leilao_artigoid VARCHAR(10) NOT NULL
+	leilao_leilaoid	 BIGINT,
+	artigo_leilao_artigoid VARCHAR(10) NOT NULL,
+	PRIMARY KEY(leilao_leilaoid)
 );
 
 CREATE TABLE notificacao (
@@ -73,6 +75,7 @@ ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk1 FOREIGN KEY (utilizador_userid)
 ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk2 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
 ALTER TABLE vendedor ADD CONSTRAINT vendedor_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 ALTER TABLE comprador ADD CONSTRAINT comprador_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
-ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
+ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
+ALTER TABLE versao ADD CONSTRAINT versao_fk2 FOREIGN KEY (artigo_leilao_artigoid) REFERENCES artigo_leilao(artigoid);
 ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 
