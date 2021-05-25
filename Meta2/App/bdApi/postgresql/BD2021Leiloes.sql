@@ -1,5 +1,5 @@
 CREATE TABLE utilizador (
-	userid	 BIGINT,
+	userid	 SERIAL,
 	username	 VARCHAR(32) UNIQUE NOT NULL,
 	email	 VARCHAR(64) UNIQUE NOT NULL,
 	password	 VARCHAR(32) NOT NULL,

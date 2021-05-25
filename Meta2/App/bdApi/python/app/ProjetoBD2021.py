@@ -39,9 +39,11 @@ def addUser():
     logger.info("---- new user  ----")
     logger.debug(f'payload: {payload}')
 
+    # Validacoes
+
     # parameterized queries, good for security and performance
     statement = """
-                  INSERT INTO Utilizador (username, email, password) 
+                  INSERT INTO utilizador (username, email, password) 
                           VALUES ( %s,   %s ,   %s )"""
 
     values = (payload["username"], payload["email"], payload["password"])
