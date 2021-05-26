@@ -160,6 +160,103 @@ def get_all_auctions():
     return jsonify(payload)
 
 
+@app.route("/dbproj/leilao", methods=['POST'])
+def criaLeilao():
+    logger.info("###              BD [Insert Auction]: POST /dbproj/leilao              ###");
+    payload = request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.info("---- New Action  ----")
+    logger.debug(f'payload: {payload}')
+
+    # parameterized queries, good for security and performance
+    # TODO
+    # Antes de adicionar à BD tenho de verificar se o ID_VENDEDOR é valido
+    statement = """
+                  INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, vendedor_utilizador_userid) 
+                          VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s, %s) RETURNING leilaoid """
+
+    values = (
+        payload["leilaoPrecoMinimo"], payload["leilaoTitulo"], payload["leilaoDescricao"], payload["leilaoDataFim"],
+        payload["artigoId"], payload["nomeArtigo"], payload["descricaoArtigo"], payload["vendedorID"])
+
+    try:
+        cur.execute(statement, values)
+        sucess = True
+        leilaoID = str(cur.fetchone()[0])
+        cur.execute("commit")
+        #result = 'Auction Created!'  # Tem de ser alterado
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        #result = 'Failed to create an auction'  # Tem de ser alterado
+    finally:
+        if conn is not None:
+            conn.close()
+
+    if sucess:
+        return jsonify(leilaoId=leilaoID)
+    else:
+        return jsonify(leilaoId='Erro a criar Leilao')
+
+
+
+@app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['GET'], strict_slashes=True)
+def getDetailsAuction(leilao_leilaoid):
+    logger.info("###              BD [Get Auction]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, maiorlicitacao, username " \
+          "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
+
+    cur.execute(sql, f'{leilao_leilaoid}')
+    rows = cur.fetchall()
+
+    # TODO
+    # Falta ir buscar as mesagens do mural - DONE
+    # historico de licitacoes - DONE
+    payload = []
+    logger.debug("---- Auction Details  ----")
+    payload.append({"DETALHES DO LEILAO": leilao_leilaoid})
+    for row in rows:
+        logger.debug(row)
+        content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
+                   'artigoid': row[4], 'nomeartigo': row[5], 'descricaoartigo': row[6], 'maiorlicitcao': row[7],
+                   'username': row[8]}
+        payload.append(content)  # appending to the payload to be returned
+
+    sql = "SELECT id, comentario, momento, username " \
+          "FROM mensagem, utilizador WHERE leilao_leilaoid = %s AND utilizador_userid = userid "
+    cur.execute(sql, f'{leilao_leilaoid}')
+    rows = cur.fetchall()
+
+    logger.debug("---- Mural Details  ----")
+    payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
+    for row in rows:
+        logger.debug(row)
+        content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
+        payload.append(content)  # appending to the payload to be returned
+
+    sql = "SELECT id, valor, username " \
+          "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
+    cur.execute(sql, f'{leilao_leilaoid}')
+    rows = cur.fetchall()
+
+    logger.debug("---- Bids Details  ----")
+    payload.append({"DETALHES DAS LICITACOES LEILAO": leilao_leilaoid})
+    for row in rows:
+        logger.debug(row)
+        content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
+        payload.append(content)  # appending to the payload to be returned
+
+    conn.close()
+    return jsonify(payload)
+
+
 def db_connection():
     db = psycopg2.connect(user = "aulaspl",
                             password = "aulaspl",
