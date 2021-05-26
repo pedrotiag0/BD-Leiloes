@@ -32,6 +32,7 @@ CREATE TABLE licitacao (
 	id				 SERIAL,
 	valor			 INTEGER NOT NULL,
 	valida			 BOOL NOT NULL DEFAULT true,
+	momento			 TIMESTAMP NOT NULL,
 	comprador_utilizador_userid BIGINT NOT NULL,
 	leilao_leilaoid		 BIGINT NOT NULL,
 	PRIMARY KEY(id)
