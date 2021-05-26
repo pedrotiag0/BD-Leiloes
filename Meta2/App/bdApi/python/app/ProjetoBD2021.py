@@ -48,15 +48,11 @@ def addUser():
     try:
         values = (payload["username"], payload["email"], payload["password"])
     except (Exception) as error:
-        codigoErro = '004'  # Payload incorreto (nome das variaveis)
-        return jsonify(erro=codigoErro)
-
-    if(len(values) != 3):
-        codigoErro = '002'  # Tamanho Payload incorreto
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
         return jsonify(erro=codigoErro)
 
     if not ((32>=len(values[0])>0) and (64>=len(values[1])>0) and (32>=len(values[2])>0)):
-        codigoErro = '003'  # Input Invalido
+        codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
 
     try:
@@ -86,7 +82,12 @@ def get_all_auctions():
     conn = db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours')")
+    try:
+        cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours')")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
     rows = cur.fetchall()
 
     payload = []
