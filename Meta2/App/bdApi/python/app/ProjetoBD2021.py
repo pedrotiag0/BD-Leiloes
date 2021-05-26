@@ -75,6 +75,65 @@ def addUser():
     else:
         return jsonify(erro=codigoErro)
 
+
+@app.route("/dbproj/user", methods=['PUT'])
+def loginUser():
+    logger.info("###              BD [Login User]: PUT /dbproj/user              ###");
+    payload = request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.info("---- login  ----")
+    logger.debug(f'payload: {payload}')
+
+    # Validacoes
+    try:
+        values = (payload["username"], payload["password"])
+    except Exception as error:
+        codigoErro = '003'  # Payload incorreto
+        return jsonify(erro=codigoErro)
+
+    username = payload["username"]
+    password = payload["password"]
+    if len(username) < 1 or len(username) > 32 or len(password) < 1 or len(password) > 32:
+        codigoErro = '002'  # Payload incorreto
+        return jsonify(erro=codigoErro)
+
+    cur.execute("SELECT userid FROM utilizador WHERE username = %s and password = %s", (username,password))
+    rows = cur.fetchall()
+
+    if len(rows) == 0:
+        codigoErro = '004'  # Credenciais incorretas
+        return jsonify(erro=codigoErro)
+
+    userid = rows[0][0]
+
+    time_limit = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)  # set limit for user
+    payload = {"userid": rows[0][0], "exp": time_limit}
+    token = jwt.encode(payload, KEY)
+
+    statement = """
+                    UPDATE utilizador 
+                      SET authtoken = %s
+                    WHERE userid = %s"""
+
+    values = (token, userid)
+
+    try:
+        cur.execute(statement, values)
+        cur.execute("commit")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'
+        return jsonify(erro=codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return jsonify(authToken=token)
+
+
 @app.route("/dbproj/leiloes", methods=['GET'], strict_slashes=True)
 def get_all_auctions():
     logger.info("###              BD [LIST AUCTIONS]: GET /dbproj/leiloes              ###")
@@ -99,6 +158,7 @@ def get_all_auctions():
 
     conn.close()
     return jsonify(payload)
+
 
 def db_connection():
     db = psycopg2.connect(user = "aulaspl",
