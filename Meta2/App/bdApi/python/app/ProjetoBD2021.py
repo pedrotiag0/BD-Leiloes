@@ -367,6 +367,72 @@ def getDetailsAuction(leilao_leilaoid):
         else:
             return jsonify(erro=codigoErro)
 
+
+@app.route("/dbproj/licitar/<leilaoId>/<licitacao>", methods=['GET'])
+def make_bidding(leilaoId, licitacao):
+    logger.info("###              BD [Make bidding]: GET /dbproj/licitar/<leilaoId>/<licitacao>             ###");
+    logger.debug(f'leilaoId: {leilaoId}, licitacao: {licitacao}')
+
+    headers = request.headers
+    authCode = headers["authCode"]
+
+    compradorId = getCompradorIdByAuthCode(authCode)
+    if (compradorId[0] == None):
+        return jsonify(erro=compradorId[1])
+    compradorId = compradorId[0]
+
+    try:
+        leilaoId = int(leilaoId)
+        licitacao = int(licitacao)
+    except (Exception, ValueError) as error:
+        codigoErro = '003'
+        return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT precominimo, maiorlicitacao, vendedor_utilizador_userid"
+                " FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and leilaoid = %s", (leilaoId,) )
+    rows = cur.fetchall()
+
+    if len(rows) == 0:
+        conn.close()
+        codigoErro = '007'
+        return jsonify(erro=codigoErro)
+
+    row = rows[0]
+    if row[2] == compradorId:
+        conn.close()
+        codigoErro = '015'
+        return jsonify(erro=codigoErro)
+
+    if licitacao < row[0] or licitacao <= row[1]:
+        conn.close()
+        codigoErro = '012'
+        return jsonify(erro=codigoErro)
+
+    try:
+        sql = "UPDATE leilao " \
+              "SET maiorlicitacao = %s" \
+              "WHERE leilaoid = %s "
+        values = (licitacao, leilaoId)
+        cur.execute(sql, values)
+
+        sql = "INSERT INTO licitacao (valor, momento, comprador_utilizador_userid, leilao_leilaoid)" \
+              "VALUES (%s,  %s,  %s,  %s)"
+        values = (licitacao, datetime.datetime.now(), compradorId, leilaoId)
+        cur.execute(sql, values)
+
+        cur.execute("commit")
+    except (Exception, psycopg2.DatabaseError) as error:
+        conn.close()
+        codigoErro = '999'
+        return str(error)
+
+    conn.close()
+    return jsonify("Sucesso")
+
+
 @app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['PUT'])
 def alteraPropriedadeLeilao(leilao_leilaoid):
     codigoErro = ''
@@ -591,6 +657,7 @@ def listAuctionsByUser():
         payload.append(content)  # appending to the payload to be returned
 
     return jsonify(payload)
+
 
 @app.route("/dbproj/msgMural/<leilao_leilaoid>", methods=['POST'])
 def sendMsgAuction(leilao_leilaoid):
