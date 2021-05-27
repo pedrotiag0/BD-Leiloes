@@ -592,6 +592,89 @@ def listAuctionsByUser():
 
     return jsonify(payload)
 
+@app.route("/dbproj/msgMural/<leilao_leilaoid>", methods=['POST'])
+def sendMsgAuction(leilao_leilaoid):
+    logger.info("###              BD [PUT Auction]: Get /dbproj/msgMural/<leilao_leilaoid>              ###");
+
+    headers = request.headers
+    payload = request.get_json()
+
+    try:
+        leilaoId = checkLeilaoAtivo(leilao_leilaoid)
+        if (leilaoId[0] == None):
+            return jsonify(erro=leilaoId[1])
+        # leilaoId = leilaoId[0]
+        leilaoId = int(leilao_leilaoid)
+        authCode = headers['authToken']
+        msg = payload['mensagem']
+        if(len(msg) > 512):
+            codigoErro = '003'
+            return jsonify(erro=codigoErro)
+    except (Exception, ValueError) as error:
+        codigoErro = '003'
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+    #return jsonify(leilaoId=leilaoId, userId=userId, msg=msg) # DEBUG
+
+    statement = """INSERT INTO mensagem (comentario, momento, utilizador_userid, leilao_leilaoid) 
+                          VALUES ( %s, (NOW() + INTERVAL '1 hours'), %s, %s) RETURNING id"""
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.info("---- new msg  ----")
+    logger.debug(f'payload: {payload}')
+
+    try:
+        cur.execute(statement, (msg, userId, leilaoId,))
+        sucess = True
+        novaMsgId = int(cur.fetchone()[0])
+        cur.execute("commit")
+    except psycopg2.IntegrityError:
+        sucess = False
+        codigoErro = '007'  # Leilao Inexistente
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+    if (sucess):
+        return jsonify(mensagemId=novaMsgId)
+    else:
+        return jsonify(erro=codigoErro)
+
+
+def checkLeilaoAtivo(idLeilao):
+    leilao = None
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT leilaoid FROM leilao WHERE leilaoid = %s AND admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours')", (idLeilao,))
+        rows = cur.fetchall()
+        if (len(rows) != 1):
+            codigoErro = '011'  # Leilão inativo
+            return (None, codigoErro)
+        leilao = rows[0]
+    except psycopg2.IntegrityError as error:
+        logger.error(error)
+        codigoErro = '010'  # Utilizador Inexistente
+        return (None, codigoErro)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+    return leilao
+
 def getUserIdByAuthCode(authCode):
     userId = None
 
