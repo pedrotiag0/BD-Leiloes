@@ -229,14 +229,14 @@ def criaLeilao():
 
     # parameterized queries, good for security and performance
     statement = """
-                  INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, vendedor_utilizador_userid) 
-                          VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s, %s) RETURNING leilaoid """
+                  INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, vendedor_utilizador_userid) 
+                          VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s) RETURNING leilaoid """
 
     # VERIFICACOES
     try:
         values = (
             payload["leilaoPrecoMinimo"], payload["leilaoTitulo"], payload["leilaoDescricao"], payload["leilaoDataFim"],
-            payload["artigoId"], payload["nomeArtigo"], payload["descricaoArtigo"], payload["vendedorID"])
+            payload["artigoId"], payload["nomeArtigo"], payload["vendedorID"])
     except Exception as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
@@ -249,8 +249,8 @@ def criaLeilao():
         return jsonify(erro=codigoErro)
 
     if not ((64 >= len(values[1]) > 0) and (512 >= len(values[2]) > 0) and (10 >= len(values[4]) > 0) and (
-            64 >= len(values[5]) > 0) and (512 >= len(values[6]) > 0)):
-        if (checkIdUtilizador(values[7]) != True):
+            64 >= len(values[5]) > 0)):
+        if (checkIdUtilizador(values[6]) != True):
             codigoErro = '006'  # ID Invalido
         else:
             codigoErro = '002'  # Input Invalido
@@ -285,7 +285,7 @@ def getDetailsAuction(leilao_leilaoid):
     conn = db_connection()
     cur = conn.cursor()
 
-    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, maiorlicitacao, username " \
+    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
           "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
     try:
@@ -298,6 +298,194 @@ def getDetailsAuction(leilao_leilaoid):
         cur.execute(sql, f'{leilao_leilaoid}')
         rows = cur.fetchall()
 
+
+        logger.debug("---- Auction Details  ----")
+
+        if len(rows) == 0:
+            codigoErro = '002'
+            return jsonify(erro=codigoErro)
+
+        payload.append({"DETALHES DO LEILAO": leilao_leilaoid})
+        for row in rows:
+            logger.debug(row)
+            content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
+                       'artigoid': row[4], 'nomeartigo': row[5],  'maiorlicitcao': row[6],
+                       'username': row[7]}
+            payload.append(content)  # appending to the payload to be returned
+
+        sql = "SELECT id, comentario, momento, username " \
+              "FROM mensagem, utilizador WHERE leilao_leilaoid = %s AND utilizador_userid = userid "
+        cur.execute(sql, f'{leilao_leilaoid}')
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            codigoErro = '002'
+            return jsonify(erro=codigoErro)
+
+        logger.debug("---- Mural Details  ----")
+        payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
+        for row in rows:
+            logger.debug(row)
+            content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
+            payload.append(content)  # appending to the payload to be returned
+
+        sql = "SELECT id, valor, username " \
+              "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
+        cur.execute(sql, f'{leilao_leilaoid}')
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            codigoErro = '002'
+            return jsonify(erro=codigoErro)
+
+        logger.debug("---- Bids Details  ----")
+        payload.append({"DETALHES DAS LICITACOES LEILAO": leilao_leilaoid})
+        sucess = True
+        for row in rows:
+            logger.debug(row)
+            content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
+            payload.append(content)  # appending to the payload to be returned
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+
+        if sucess:
+            return jsonify(payload)
+        else:
+            return jsonify(erro=codigoErro)
+
+@app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['PUT'])
+def alteraPropriedadeLeilao(leilao_leilaoid):
+    codigoErro = ''
+    payload = []
+    sucess = False
+    logger.info(
+        "###              BD [Change Auction Properties]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
+
+    payload = request.get_json()
+    conn = db_connection()
+    cur = conn.cursor()
+
+    sql = "SELECT leilaoid, titulo, descricao " \
+          "FROM leilao WHERE leilaoid = %s "
+
+    try:
+        leilaoID = int(leilao_leilaoid)
+    except (Exception, ValueError) as error:
+        codigoErro = '003'  # NAO É NUMERO
+        return jsonify(erro=codigoErro)
+
+    try:
+        cur.execute(sql, f'{leilao_leilaoid}')
+
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            codigoErro = '002'  # Input invalido
+            return jsonify(erro=codigoErro)
+
+        newTitle = payload['novoTitulo']
+        newDescription = payload['novaDescricao']
+        for row in rows:
+            leilaoID = int(row[0])
+            currentTitle = row[1]
+            currentDescription = row[2]
+
+        # COLOCAR LEILAO ORIGINAL NA TABELA DE VERSAO
+        sql = "INSERT INTO versao (titulo, descricao, leilao_leilaoid)" \
+              "VALUES (%s,  %s,  %s)"
+        try:
+            values = (currentTitle, currentDescription, leilaoID)
+        except (Exception) as error:
+            codigoErro = '003'  # Payload incorreto (nome das variaveis)
+            return jsonify(erro=codigoErro)
+
+        try:
+            cur.execute(sql, values)
+            cur.execute("commit")
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(error)
+            sucess = False
+            codigoErro = '999'  # Erro nao identificado
+
+        if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
+            codigoErro = '002'  # Input Invalido
+            return jsonify(erro=codigoErro)
+
+        if len(newTitle) == 0:
+            newTitle = currentTitle
+
+        if len(newDescription) == 0:
+            newDescription = currentDescription
+
+        if len(newTitle) == 0 and len(newDescription) == 0 or currentTitle == newTitle and currentDescription == newDescription:
+            codigoErro = '002'  # As alteracoes estao vazias/iguais e nao se altera nada
+            return jsonify(erro=codigoErro)
+
+        sql = "UPDATE leilao " \
+              "SET titulo = %s,  descricao = %s " \
+              "WHERE leilaoid = %s "
+
+        values = (newTitle, newDescription, leilao_leilaoid)
+        try:
+            cur.execute(sql, values)
+            cur.execute("commit")
+            sucess = True
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(error)
+            codigoErro = '999'
+            return jsonify(erro=codigoErro)
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+
+        if sucess:
+            return jsonify(payload)
+        else:
+            return jsonify(erro=codigoErro)
+
+
+@app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
+def banUser():
+    codigoErro = ''
+    payload = []
+    sucess = False
+    logger.info("###              BD [Ban User Auction]: Put /dbproj/leilao/ban/<userid>             ###");
+
+    payload = request.get_json()
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # TODO
+    # JSON RECEBE o admin e o user a banir - DONE
+    # Colocar ID Admin na tabela utilizador na linha do user a banir
+    # Verificar se o user tem algum leilao a decorrer
+    # Caso tenha, invalidar a licitacao, alterar o parametro valida
+    # Obter a maior licitacao  e corresponder o seu valor ao valor da invalida
+    # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notifcação
+
+    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, maiorlicitacao, username " \
+          "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
+
+    try:
+        leilaoID = int(leilao_leilaoid)
+    except (Exception, ValueError) as error:
+        codigoErro = '003'
+        return jsonify(erro=codigoErro)
+
+    try:
+        cur.execute(sql, f'{leilao_leilaoid}')
+        rows = cur.fetchall()
 
         logger.debug("---- Auction Details  ----")
 
@@ -360,6 +548,65 @@ def getDetailsAuction(leilao_leilaoid):
             return jsonify(erro=codigoErro)
 
 
+
+@app.route("/dbproj/leiloesAtividade", methods=['GET'], strict_slashes=True)
+def listAuctionsByUser():
+    logger.info("###              BD [Get Auction By User]: Get /dbproj/leiloesAtividade              ###");
+
+    headers = request.headers
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if(userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+    #return jsonify(Encontrei=userId) #DEBUG
+
+    statement = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao" \
+                " FROM leilao AS l" \
+                " WHERE ((SELECT COUNT(*) FROM leilao AS l2 WHERE vendedor_utilizador_userid = %s AND l2.leilaoid = l.leilaoid) +" \
+    	" (SELECT COUNT(*) FROM licitacao AS l3 WHERE comprador_utilizador_userid = %s AND l3.leilao_leilaoid = l.leilaoid)) > 0"
+
+    cur.execute(statement, (userId, userId,))
+    rows = cur.fetchall()
+    payload = []
+    for row in rows:
+        content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
+                       'artigoid': row[4], 'nomeartigo': row[5], 'maiorlicitcao': row[6]}
+        payload.append(content)  # appending to the payload to be returned
+
+    return jsonify(payload)
+
+def getUserIdByAuthCode(authCode):
+    userId = None
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT userid FROM utilizador WHERE authToken = %s", (authCode,))
+        rows = cur.fetchall()
+        if(len(rows) != 1):
+            codigoErro = '005'  # Utilizador nao registado na base de dados
+            return (None, codigoErro)
+        userId = rows[0]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return userId
+			
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
                           password="aulaspl",
