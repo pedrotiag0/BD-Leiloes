@@ -594,7 +594,7 @@ def listAuctionsByUser():
 
 @app.route("/dbproj/msgMural/<leilao_leilaoid>", methods=['POST'])
 def sendMsgAuction(leilao_leilaoid):
-    logger.info("###              BD [PUT Auction]: Get /dbproj/msgMural/<leilao_leilaoid>              ###");
+    logger.info("###              BD [PUT Auction]: POST /dbproj/msgMural/<leilao_leilaoid>              ###");
 
     headers = request.headers
     payload = request.get_json()
@@ -603,8 +603,8 @@ def sendMsgAuction(leilao_leilaoid):
         leilaoId = checkLeilaoAtivo(leilao_leilaoid)
         if (leilaoId[0] == None):
             return jsonify(erro=leilaoId[1])
-        # leilaoId = leilaoId[0]
-        leilaoId = int(leilao_leilaoid)
+        leilaoId = leilaoId[0]
+        # leilaoId = int(leilao_leilaoid)
         authCode = headers['authToken']
         msg = payload['mensagem']
         if(len(msg) > 512):
@@ -659,13 +659,9 @@ def checkLeilaoAtivo(idLeilao):
         cur.execute("SELECT leilaoid FROM leilao WHERE leilaoid = %s AND admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours')", (idLeilao,))
         rows = cur.fetchall()
         if (len(rows) != 1):
-            codigoErro = '011'  # Leilão inativo
+            codigoErro = '007'  # Leilão inativo/inexistente
             return (None, codigoErro)
         leilao = rows[0]
-    except psycopg2.IntegrityError as error:
-        logger.error(error)
-        codigoErro = '010'  # Utilizador Inexistente
-        return (None, codigoErro)
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
@@ -674,6 +670,94 @@ def checkLeilaoAtivo(idLeilao):
         if conn is not None:
             conn.close()
     return leilao
+
+@app.route("/dbproj/adminStats", methods=['GET'])
+def getAdminStats():
+    logger.info("###              BD [GET AdminStats]: Get /dbproj/msgMural/<leilao_leilaoid>              ###");
+
+    headers = request.headers
+    try:
+        authCode = headers['authToken']
+    except (Exception, ValueError) as error:
+        codigoErro = '003'  # Input Invalido
+        return jsonify(erro=codigoErro)
+
+    adminId = getUserIdByAuthCode(authCode)
+    if (adminId[0] == None):
+        return jsonify(erro=adminId[1])
+    adminId = adminId[0]
+
+    resposta = []
+
+    # TOP 10 UTILIZADORES COM MAIS LEILÕES CRIADOS
+    conn = db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT userid, username, COUNT(leilao.leilaoid) FROM utilizador, leilao" \
+                    " WHERE utilizador.userid = leilao.vendedor_utilizador_userid" \
+                    " GROUP BY userid, username ORDER BY COUNT DESC")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    aux = []
+    count = 0
+    logger.debug("---- Top 10 Utilizadores com mais leiloes criados  ----")
+    for row in rows:
+        if count == 10:
+            break
+        logger.debug(row)
+        content = {'userId': int(row[0]), 'Username': row[1], 'Leiloes Criados' : int(row[2])}
+        aux.append(content)  # appending to the payload to be returned
+        count += 1
+    aux.insert(0, "Top " + str(count) + " Utilizadores com mais leiloes criados")
+    resposta.append(aux)
+
+    # TOP 10 UTILIZADORES QUE MAIS LEILÕES VENCERAM
+    try:
+        cur.execute("SELECT userid, username, COUNT(leilao.leilaoid) FROM utilizador, leilao, licitacao" \
+                    " WHERE leilao.maiorlicitacao = licitacao.valor AND leilao.leilaoid = licitacao.leilao_leilaoid" \
+                    " AND licitacao.comprador_utilizador_userid = utilizador.userid" \
+                    " AND licitacao.valida = TRUE AND admincancelou IS NULL" \
+                    " AND leilao.datafim < (NOW() + INTERVAL '1 hours')" \
+                    " GROUP BY userid, username ORDER BY COUNT DESC")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+    aux = []
+    count = 0
+    logger.debug("---- Top 10 Utilizadores que mais leiloes venceram  ----")
+    for row in rows:
+        if count == 10:
+            break
+        logger.debug(row)
+        content = {'userId': int(row[0]), 'Username': row[1], 'Leiloes Vencidos' : int(row[2])}
+        aux.append(content)  # appending to the payload to be returned
+        count += 1
+    aux.insert(0, "Top " + str(count) + " Utilizadores que mais leiloes venceram")
+    resposta.append(aux)
+
+    # NÚMERO TOTAL DE LEILÕES NOS ÚLTIMOS 10 DIAS
+    try:
+        cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE datafim > (NOW() - INTERVAL '-1 hour 10 days')")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+    rows = cur.fetchall()
+    logger.debug("---- Numero total de leiloes nos ultimos 10 dias  ----")
+    logger.debug(rows)
+    content = {'Numero total de leiloes nos ultimos 10 dias': int(rows[0][0])}
+    resposta.append(content)
+    if conn is not None:
+        conn.close()
+
+    return jsonify(resposta)
+
+
 
 def getUserIdByAuthCode(authCode):
     userId = None
@@ -697,6 +781,29 @@ def getUserIdByAuthCode(authCode):
             conn.close()
 
     return userId
+
+def getAdminIdByAuthCode(authCode):
+    adminId = None
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT utilizador_userid FROM administrador, utilizador  WHERE authToken = %s AND utilizador_userid = userid", (authCode,))
+        rows = cur.fetchall()
+        if(len(rows) != 1):
+            codigoErro = '011'  # Utilizador nao e um admin/não existe
+            return (None, codigoErro)
+        adminId = rows[0]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return adminId
 			
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
