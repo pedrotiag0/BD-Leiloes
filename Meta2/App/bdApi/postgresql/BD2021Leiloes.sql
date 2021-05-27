@@ -23,7 +23,6 @@ CREATE TABLE leilao (
 	admincancelou		 BIGINT,
 	artigoid			 VARCHAR(10) NOT NULL,
 	nomeartigo		 VARCHAR(64) NOT NULL,
-	descricaoartigo		 VARCHAR(512) NOT NULL,
 	vendedor_utilizador_userid BIGINT NOT NULL,
 	PRIMARY KEY(leilaoid)
 );
@@ -60,6 +59,7 @@ CREATE TABLE comprador (
 );
 
 CREATE TABLE versao (
+	versaoid	 SERIAL,
 	titulo		 VARCHAR(64) NOT NULL,
 	descricao	 VARCHAR(512),
 	leilao_leilaoid BIGINT,
