@@ -162,6 +162,47 @@ def get_all_auctions():
     return jsonify(payload)
 
 
+@app.route("/dbproj/leiloes/<keyword>", methods=['GET'])
+def get_auction(keyword):
+    logger.info("###              BD [Get auction(s)]: GET /dbproj/leiloes/<keyword>              ###");
+
+    logger.debug(f'keyword: {keyword}')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and artigoid = %s", (keyword,) )
+    rows = cur.fetchall()
+    payload = []
+
+    if len(rows) == 1:
+        row = rows[0]
+        logger.debug("---- selected auction  ----")
+        logger.debug(row)
+        content = {'leilaoId': int(row[0]), 'descricao': row[1]}
+        payload.append(content)  # appending to the payload to be returned
+        conn.close()
+        return jsonify(payload)
+
+    query = '%' + keyword + '%'
+    cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and LOWER(descricao) LIKE %s",
+                (query,))
+    rows = cur.fetchall()
+
+    if len(rows) == 0:
+        conn.close()
+        return jsonify(payload)
+
+    logger.debug("---- selected auction(s)  ----")
+    for row in rows:
+        logger.debug(row)
+        content = {'leilaoId': int(row[0]), 'descricao': row[1]}
+        payload.append(content)  # appending to the payload to be returned
+
+    conn.close()
+    return jsonify(payload)
+
+
 def checkIdUtilizador(idVendedor):
     conn = db_connection()
     cur = conn.cursor()
