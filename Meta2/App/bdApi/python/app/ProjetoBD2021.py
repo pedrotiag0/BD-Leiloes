@@ -804,7 +804,32 @@ def getAdminIdByAuthCode(authCode):
             conn.close()
 
     return adminId
-			
+
+
+def getCompradorIdByAuthCode(authCode):
+    compradorId = None
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT utilizador_userid FROM comprador, utilizador  WHERE authToken = %s AND utilizador_userid = userid", (authCode,))
+        rows = cur.fetchall()
+        if(len(rows) != 1):
+            codigoErro = '014'  # Utilizador nao e um comprador/não existe
+            return (None, codigoErro)
+        compradorId = rows[0]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return compradorId
+
+
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
                           password="aulaspl",
