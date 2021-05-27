@@ -244,6 +244,7 @@ def getDetailsAuction(leilao_leilaoid):
     conn = db_connection()
     cur = conn.cursor()
 
+
     sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
           "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
@@ -256,7 +257,6 @@ def getDetailsAuction(leilao_leilaoid):
     try:
         cur.execute(sql, f'{leilao_leilaoid}')
         rows = cur.fetchall()
-
 
         logger.debug("---- Auction Details  ----")
 
@@ -274,36 +274,44 @@ def getDetailsAuction(leilao_leilaoid):
 
         sql = "SELECT id, comentario, momento, username " \
               "FROM mensagem, utilizador WHERE leilao_leilaoid = %s AND utilizador_userid = userid "
-        cur.execute(sql, f'{leilao_leilaoid}')
-        rows = cur.fetchall()
 
-        if len(rows) == 0:
-            codigoErro = '002'
+
+        try:
+            cur.execute(sql, f'{leilao_leilaoid}')
+            rows = cur.fetchall()
+
+            if len(rows) == 0:
+                codigoErro = 'Nao ha mensagens'
+                
+
+            logger.debug("---- Mural Details  ----")
+            payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
+            for row in rows:
+                logger.debug(row)
+                content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
+                payload.append(content)  # appending to the payload to be returned
+
+            sql = "SELECT id, valor, username " \
+                  "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
+            cur.execute(sql, f'{leilao_leilaoid}')
+            rows = cur.fetchall()
+
+            if len(rows) == 0: #Nao ha licitacoes
+                codigoErro = 'Nao ha licitacoes'
+
+
+            logger.debug("---- Bids Details  ----")
+            payload.append({"DETALHES DAS LICITACOES LEILAO": leilao_leilaoid})
+            sucess = True
+            for row in rows:
+                logger.debug(row)
+                content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
+                payload.append(content)  # appending to the payload to be returned
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(error)
+            codigoErro = '999'
             return jsonify(erro=codigoErro)
-
-        logger.debug("---- Mural Details  ----")
-        payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
-        for row in rows:
-            logger.debug(row)
-            content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
-            payload.append(content)  # appending to the payload to be returned
-
-        sql = "SELECT id, valor, username " \
-              "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
-        cur.execute(sql, f'{leilao_leilaoid}')
-        rows = cur.fetchall()
-
-        if len(rows) == 0:
-            codigoErro = '002'
-            return jsonify(erro=codigoErro)
-
-        logger.debug("---- Bids Details  ----")
-        payload.append({"DETALHES DAS LICITACOES LEILAO": leilao_leilaoid})
-        sucess = True
-        for row in rows:
-            logger.debug(row)
-            content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
-            payload.append(content)  # appending to the payload to be returned
 
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
@@ -415,7 +423,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
 
 @app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
-def banUser():
+def banUser(leilao_leilaoid):
     codigoErro = ''
     payload = []
     sucess = False
@@ -433,7 +441,7 @@ def banUser():
     # Obter a maior licitacao  e corresponder o seu valor ao valor da invalida
     # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notifcação
 
-    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, descricaoartigo, maiorlicitacao, username " \
+    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
           "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
     try:
@@ -456,8 +464,8 @@ def banUser():
         for row in rows:
             logger.debug(row)
             content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
-                       'artigoid': row[4], 'nomeartigo': row[5], 'descricaoartigo': row[6], 'maiorlicitcao': row[7],
-                       'username': row[8]}
+                       'artigoid': row[4], 'nomeartigo': row[5], 'maiorlicitcao': row[6],
+                       'username': row[7]}
             payload.append(content)  # appending to the payload to be returned
 
         sql = "SELECT id, comentario, momento, username " \
