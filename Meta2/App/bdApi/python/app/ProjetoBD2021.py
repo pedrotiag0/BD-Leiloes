@@ -508,6 +508,64 @@ def banUser():
 
 
 
+@app.route("/dbproj/leiloesAtividade", methods=['GET'], strict_slashes=True)
+def listAuctionsByUser():
+    logger.info("###              BD [Get Auction By User]: Get /dbproj/leiloesAtividade              ###");
+
+    headers = request.headers
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if(userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+    #return jsonify(Encontrei=userId) #DEBUG
+
+    statement = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao" \
+                " FROM leilao AS l" \
+                " WHERE ((SELECT COUNT(*) FROM leilao AS l2 WHERE vendedor_utilizador_userid = %s AND l2.leilaoid = l.leilaoid) +" \
+    	" (SELECT COUNT(*) FROM licitacao AS l3 WHERE comprador_utilizador_userid = %s AND l3.leilao_leilaoid = l.leilaoid)) > 0"
+
+    cur.execute(statement, (userId, userId,))
+    rows = cur.fetchall()
+    payload = []
+    for row in rows:
+        content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
+                       'artigoid': row[4], 'nomeartigo': row[5], 'maiorlicitcao': row[6]}
+        payload.append(content)  # appending to the payload to be returned
+
+    return jsonify(payload)
+
+def getUserIdByAuthCode(authCode):
+    userId = None
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT userid FROM utilizador WHERE authToken = %s", (authCode,))
+        rows = cur.fetchall()
+        if(len(rows) != 1):
+            codigoErro = '005'  # Utilizador nao registado na base de dados
+            return (None, codigoErro)
+        userId = rows[0]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return userId
+			
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
                           password="aulaspl",
