@@ -19,7 +19,7 @@ CREATE TABLE leilao (
 	titulo			 VARCHAR(64) NOT NULL,
 	descricao			 VARCHAR(512) NOT NULL,
 	datafim			 TIMESTAMP NOT NULL,
-	maiorlicitacao		 INTEGER NOT NULL,
+	maiorlicitacao		 INTEGER NOT NULL DEFAULT 0,
 	admincancelou		 BIGINT,
 	artigoid			 VARCHAR(10) NOT NULL,
 	nomeartigo		 VARCHAR(64) NOT NULL,
