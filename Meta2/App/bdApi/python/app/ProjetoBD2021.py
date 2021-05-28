@@ -251,7 +251,7 @@ def criaLeilao():
     if not ((64 >= len(values[1]) > 0) and (512 >= len(values[2]) > 0) and (10 >= len(values[4]) > 0) and (
             64 >= len(values[5]) > 0)):
         if (checkIdUtilizador(values[6]) != True):
-            codigoErro = '006'  # ID Invalido
+            codigoErro = '009'  # ID Vendedor inexistente
         else:
             codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
@@ -302,7 +302,7 @@ def getDetailsAuction(leilao_leilaoid):
         logger.debug("---- Auction Details  ----")
 
         if len(rows) == 0:
-            codigoErro = '002'
+            codigoErro = '007'
             return jsonify(erro=codigoErro)
 
         payload.append({"DETALHES DO LEILAO": leilao_leilaoid})
@@ -464,7 +464,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
 
 @app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
-def banUser(leilao_leilaoid):
+def banUser():
     codigoErro = ''
     payload = []
     sucess = False
@@ -476,76 +476,175 @@ def banUser(leilao_leilaoid):
 
     # TODO
     # JSON RECEBE o admin e o user a banir - DONE
-    # Colocar ID Admin na tabela utilizador na linha do user a banir
-    # Verificar se o user tem algum leilao a decorrer
-    # Caso tenha, invalidar a licitacao, alterar o parametro valida
-    # Obter a maior licitacao  e corresponder o seu valor ao valor da invalida
-    # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notifcação
+    # Colocar ID Admin na tabela utilizador na linha do user a banir - DONE
+    # Verificar se o user tem algum leilao a decorrer - DONE
+    # Caso tenha, invalidar a licitacao se tiver, alterar o parametro valida - DONE
+    # Obter a maior licitacao  e corresponder o seu valor ao valor da invalida - DONE
+    # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notifcacao
 
-    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
-          "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
+    # Colocar ID Admin na tabela utilizador na linha do user a banir
+    sql = "UPDATE utilizador " \
+          "SET adminbaniu = %s " \
+          "WHERE userid = %s"
 
     try:
-        leilaoID = int(leilao_leilaoid)
+        values = (payload['adminID'], payload['userID'])
     except (Exception, ValueError) as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'
+        return jsonify(erro=codigoErro)
 
     try:
-        cur.execute(sql, f'{leilao_leilaoid}')
+        cur.execute(sql, values)
+        cur.execute("commit")
+        #sucess = True
+        #logger.debug("---- Auction Details  ----")
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'
+        return jsonify(erro=codigoErro)
+
+    # Verificar se o user tem algum leilao a decorrer
+    sql = "SELECT * " \
+          "FROM leilao " \
+          "WHERE vendedor_utilizador_userid = %s AND datafim > (NOW() + INTERVAL '1 hours')"
+
+    try:
+        values = [payload['userID']]
+        cur.execute(sql, values)
         rows = cur.fetchall()
 
-        logger.debug("---- Auction Details  ----")
+        if len(rows) == 0: # Significa que nao esta a vender nada atualmente
+            codigoErro = '008' # User nao tem leiloes a decorrer
 
-        if len(rows) == 0:
-            codigoErro = '002'
-            return jsonify(erro=codigoErro)
+        else: # Significa que tem leiloes ativos e temos de as cancelar
+            sql = "UPDATE leilao " \
+                  "SET admincancelou = %s " \
+                  "WHERE vendedor_utilizador_userid = %s"
 
-        payload.append({"DETALHES DO LEILAO": leilao_leilaoid})
-        for row in rows:
-            logger.debug(row)
-            content = {'leilaoid': int(row[0]), 'titulo': row[1], 'descricao': row[2], 'datafim': row[3],
-                       'artigoid': row[4], 'nomeartigo': row[5], 'maiorlicitcao': row[6],
-                       'username': row[7]}
-            payload.append(content)  # appending to the payload to be returned
+            values = (payload['adminID'], payload['userID'])
+            try:
+                cur.execute(sql, values)
+                cur.execute("commit")
+            except (Exception, psycopg2.DatabaseError) as error:
+                logger.error(error)
+                codigoErro = '999'
+                return jsonify(erro=codigoErro)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'
+        logger.debug('SAIII:')
+        return jsonify(erro=codigoErro)
 
-        sql = "SELECT id, comentario, momento, username " \
-              "FROM mensagem, utilizador WHERE leilao_leilaoid = %s AND utilizador_userid = userid "
-        cur.execute(sql, f'{leilao_leilaoid}')
+    # Verificar se o user a banir tem alguma licitacao e invalida-la
+    sql = "UPDATE licitacao " \
+          "SET valida = false " \
+          "WHERE comprador_utilizador_userid = %s"
+
+    values = [payload['userID']]
+    affected_rows = 0
+    try:
+        cur.execute(sql, values)
+        affected_rows = cur.rowcount
+        cur.execute("commit")
+        logger.debug(f'ROWS AFFECTED: {affected_rows}')
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999' # comprador invalido ou nao tem licitacoes
+
+        return jsonify(erro=codigoErro)
+
+    if affected_rows == 0: #Significa que o user nao tinha licitacoes
+        codigoErro = '019'
+        return jsonify(erro=codigoErro)
+    else: #Significa que o user tinha licitacoes
+        # E preciso obter o valor da licitacao max do user de todos os leiloes
+        sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
+        values = [payload['userID']]
+        cur.execute(sql ,values)
         rows = cur.fetchall()
 
-        if len(rows) == 0:
-            codigoErro = '002'
-            return jsonify(erro=codigoErro)
+        for row in rows: #Vou percorrer cada leilao que ele pertence para modificar as licitacoes
+            leilaoID = row[0]
+            logger.debug(f'LEILAO ID: {leilaoID}, TYPE: {type(leilaoID)}')
 
-        logger.debug("---- Mural Details  ----")
-        payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
-        for row in rows:
-            logger.debug(row)
-            content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
-            payload.append(content)  # appending to the payload to be returned
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s "
+            sqlValues = (payload['userID'], leilaoID)
+            cur.execute(sqlQuery, sqlValues)
+            maxValueUser = cur.fetchall()[0]
 
-        sql = "SELECT id, valor, username " \
-              "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
-        cur.execute(sql, f'{leilao_leilaoid}')
-        rows = cur.fetchall()
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s "
+            cur.execute(sqlQuery, [leilaoID])
+            maxBidAuction = cur.fetchall()[0]
 
-        if len(rows) == 0:
-            codigoErro = '002'
-            return jsonify(erro=codigoErro)
+            if  maxValueUser < maxBidAuction: #invalidar todas as licitacoes entre estes 2 valores e colocar a maior licitacao com o valor do user a banir
+                sqlQuery = "UPDATE licitacao SET valida = "\
+                                        "CASE " \
+                                            "WHEN valor = %s THEN true " \
+                                            "WHEN valor >= %s AND valor < %s THEN false " \
+                                            "ELSE true "\
+                                        "END, " \
+                                    "valor = "\
+                                        "CASE " \
+                                            "WHEN valor = %s THEN %s "\
+                                            "ELSE valor " \
+                                        "END "\
+                            "WHERE leilao_leilaoid = %s"
 
-        logger.debug("---- Bids Details  ----")
-        payload.append({"DETALHES DAS LICITACOES LEILAO": leilao_leilaoid})
+                values = (maxBidAuction, maxValueUser, maxBidAuction, maxBidAuction, maxValueUser, leilaoID)
+                try:
+                    cur.execute(sqlQuery, values)
+                    cur.execute("commit")
+                except (Exception, psycopg2.DatabaseError) as error:
+                    logger.error(error)
+                    codigoErro = '999'
+                    return jsonify(erro=codigoErro)
+
+            # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notificacao
+            sqlQuery = "INSERT INTO mensagem (comentario, momento, utilizador_userid, leilao_leilaoid)" \
+                        "VALUES (%s, NOW(), %s , %s)"
+
+            try:
+                comentario = f"Lamentamos o incomodo mas o utilizador {payload['userID']} foi banido do leilao {leilaoID}"
+                values = (comentario, payload['userID'], leilaoID)
+            except (Exception, ValueError) as error:
+                codigoErro = '003'
+                return jsonify(erro=codigoErro)
+
+            try:
+                cur.execute(sqlQuery, values)
+                cur.execute("commit")
+            except (Exception, psycopg2.DatabaseError) as error:
+                logger.error(error)
+                sucess = False
+                codigoErro = '999'  # Erro nao identificado
+
+            comentario = f"Utilizador {payload['userID']} foi banido do leilao {leilaoID}"
+            sqlQuery = "INSERT INTO notificacao (comentario, momento, utilizador_userid) "\
+                        "SELECT %s, NOW(), comprador_utilizador_userid " \
+                       "FROM licitacao WHERE leilao_leilaoid = %s"
+
+            values = (comentario, leilaoID)
+            try:
+                cur.execute(sqlQuery, values)
+                cur.execute("commit")
+            except (Exception, psycopg2.DatabaseError) as error:
+                logger.error(error)
+                sucess = False
+                codigoErro = '999'  # Erro nao identificado
+            # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAIXIMA ENTAO CONTA A SEGUNDA MELHOR
+
+
+    try:
         sucess = True
-        for row in rows:
-            logger.debug(row)
-            content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
-            payload.append(content)  # appending to the payload to be returned
-
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+
     finally:
         if conn is not None:
             conn.close()
