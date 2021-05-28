@@ -352,8 +352,10 @@ def checkIdUtilizador(idVendedor):
 def criaLeilao():
     logger.info("###              BD [Insert Auction]: POST /dbproj/leilao              ###");
     payload = request.get_json()
+    headers = request.headers
+    authCode = headers["authToken"]
 
-    vendedorID = getVendedorIdByAuthCode(payload["vendedorID"])
+    vendedorID = getVendedorIdByAuthCode(authCode)
     if (vendedorID[0] == None):
         return jsonify(erro=vendedorID[1])
     vendedorID = vendedorID[0]
@@ -735,8 +737,10 @@ def banUser():
     logger.info("###              BD [Ban User Auction]: Put /dbproj/leilao/ban/<userid>             ###");
 
     payload = request.get_json()
+    headers = request.headers
+    authCode = headers["authToken"]
 
-    adminID = getAdminIdByAuthCode(payload['adminID'])
+    adminID = getAdminIdByAuthCode(authCode)
     userID = getUserIdByAuthCode(payload['userID'])
 
 
