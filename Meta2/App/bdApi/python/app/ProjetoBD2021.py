@@ -353,8 +353,7 @@ def criaLeilao():
     logger.info("###              BD [Insert Auction]: POST /dbproj/leilao              ###");
     payload = request.get_json()
 
-    #TODO -> ALTERAR PARA GET VENDEDOR BY AUTH CODE
-    vendedorID = getUserIdByAuthCode(payload["vendedorID"])
+    vendedorID = getVendedorIdByAuthCode(payload["vendedorID"])
     if (vendedorID[0] == None):
         return jsonify(erro=vendedorID[1])
     vendedorID = vendedorID[0]
@@ -1300,6 +1299,29 @@ def getCompradorIdByAuthCode(authCode):
             conn.close()
 
     return compradorId
+
+def getVendedorIdByAuthCode(authCode):
+    vendedorId = None
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT utilizador_userid FROM vendedor, utilizador  WHERE authToken = %s AND utilizador_userid = userid", (authCode,))
+        rows = cur.fetchall()
+        if(len(rows) != 1):
+            codigoErro = '014'  # Utilizador nao e um comprador/não existe
+            return (None, codigoErro)
+        vendedorId = rows[0]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        codigoErro = '999'  # Erro nao identificado
+        return (None, codigoErro)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return vendedorId
 
 
 def db_connection():
