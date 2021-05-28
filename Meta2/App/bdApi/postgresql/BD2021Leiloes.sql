@@ -61,7 +61,7 @@ CREATE TABLE comprador (
 CREATE TABLE versao (
 	versaoid	 SERIAL,
 	titulo		 VARCHAR(64) NOT NULL,
-	descricao	 VARCHAR(512),
+	descricao	 VARCHAR(512) NOT NULL,
 	leilao_leilaoid BIGINT,
 	PRIMARY KEY(versaoid)
 );
