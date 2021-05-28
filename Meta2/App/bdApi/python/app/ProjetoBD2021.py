@@ -948,6 +948,48 @@ def sendMsgAuction(leilao_leilaoid):
         return jsonify(erro=codigoErro)
 
 
+@app.route("/dbproj/caixaEntrada", methods=['GET'], strict_slashes=True)
+def get_inbox():
+    logger.info("###              BD [Get Inbox By User]: Get /dbproj/caixaEntrada              ###");
+
+    headers = request.headers
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if(userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+    #return jsonify(Encontrei=userId) #DEBUG
+
+    cur.execute("SELECT username, leilao_leilaoid, comentario, momento FROM mensagem, utilizador "
+                "WHERE utilizador_userid = userid AND utilizador_userid != %s "
+                "AND leilao_leilaoid IN (SELECT leilao_leilaoid FROM mensagem WHERE utilizador_userid = %s) "
+                "ORDER BY momento DESC"
+                , (userId, userId))
+    rows = cur.fetchall()
+    payload = []
+    for row in rows:
+        #“Username”: “User1”, "LeilaoId": 2, "Momento": "2021-05-27 11:17:54", "Comentario": “oi”
+        content = {'Username': row[0], 'LeilaoId': row[1], 'Comentario': row[2], 'Momento': row[3]}
+        payload.append(content)  # appending to the payload to be returned
+
+    cur.execute("SELECT leilao_leilaoid, comentario, momento FROM notificacao WHERE utilizador_userid = %s", (userId,))
+    rows = cur.fetchall()
+    for row in rows:
+        #"LeilaoId": 7, "Aviso": “Licitação ultrapassada.”, "Momento": "2021-05-27 19:13:49"
+        content = {'LeilaoId': row[0], 'Aviso': row[1], 'Momento': row[2]}
+        payload.append(content)  # appending to the payload to be returned
+
+    return jsonify(payload)
+
+
 def checkLeilaoAtivo(idLeilao):
     leilao = None
     conn = db_connection()
