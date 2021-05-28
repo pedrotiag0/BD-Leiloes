@@ -588,7 +588,8 @@ def make_bidding(leilaoId, licitacao):
     cur = conn.cursor()
 
     cur.execute("SELECT precominimo, maiorlicitacao, vendedor_utilizador_userid"
-                " FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and leilaoid = %s", (leilaoId,) )
+                " FROM leilao WHERE admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours') "
+                "and leilaoid = %s", (leilaoId,) )
     rows = cur.fetchall()
 
     if len(rows) == 0:
@@ -924,6 +925,43 @@ def banUser():
             return jsonify(erro=codigoErro)
 
 
+@app.route("/dbproj/cancelarLeilao/<leilaoId>", methods=['PUT'], strict_slashes=True)
+def cancel_auction(leilaoId):
+    logger.info("###              BD [Cancel auction]: GET /dbproj/cancelarLeilao/<leilaoId>             ###");
+    logger.debug(f'leilaoId: {leilaoId}')
+
+    headers = request.headers
+    authCode = headers["authToken"]
+
+    adminId = getAdminIdByAuthCode(authCode)
+    if (adminId[0] == None):
+        return jsonify(erro=adminId[1])
+    adminId = adminId[0]
+
+    try:
+        leilaoId = int(leilaoId)
+    except (Exception, ValueError) as error:
+        codigoErro = '003'
+        return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT leilaoid FROM leilao "
+                "WHERE admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours') AND leilaoid = %s"
+                , (leilaoId,))
+    rows = cur.fetchall()
+    if len(rows) == 0:
+        conn.close()
+        codigoErro = '007'
+        return jsonify(erro=codigoErro)
+
+    cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
+
+    cur.execute("commit")
+    conn.close()
+    return jsonify(leilaoId=leilaoId)
+
 
 @app.route("/dbproj/leiloesAtividade", methods=['GET'], strict_slashes=True)
 def listAuctionsByUser():
@@ -1168,7 +1206,30 @@ def getAdminStats():
 
     return jsonify(resposta)
 
+@app.route("/dbproj/versoes/<leilaoid>", methods=['GET'])
+def getVersoesLeilao(leilaoid):
+    logger.info("###              BD [GET OLD AUCTION VERSIONS]: GET /dbproj/versoes/<leilaoid>              ###")
 
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT versaoid, titulo, descricao FROM versao WHERE leilao_leilaoid = %s", (leilaoid,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    payload = []
+    logger.debug("---- Versoes Leiloes  ----")
+    for row in rows:
+        logger.debug(row)
+        content = {'versaoId': int(row[0]), 'titulo': row[1], 'descricao': row[2]}
+        payload.append(content)  # appending to the payload to be returned
+
+    conn.close()
+    return jsonify(payload)
 
 def getUserIdByAuthCode(authCode):
     userId = None

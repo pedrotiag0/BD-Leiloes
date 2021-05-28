@@ -61,17 +61,17 @@ CREATE TABLE comprador (
 CREATE TABLE versao (
 	versaoid	 SERIAL,
 	titulo		 VARCHAR(64) NOT NULL,
-	descricao	 VARCHAR(512),
+	descricao	 VARCHAR(512) NOT NULL,
 	leilao_leilaoid BIGINT,
-	PRIMARY KEY(leilao_leilaoid)
+	PRIMARY KEY(versaoid)
 );
 
 CREATE TABLE notificacao (
 	id		 SERIAL,
 	comentario	 VARCHAR(512) NOT NULL,
 	momento		 TIMESTAMP NOT NULL,
-	utilizador_userid BIGINT NOT NULL,
 	leilao_leilaoid	 BIGINT NOT NULL,
+	utilizador_userid BIGINT NOT NULL,
 	PRIMARY KEY(id)
 );
 
@@ -84,4 +84,5 @@ ALTER TABLE mensagem ADD CONSTRAINT mensagem_fk2 FOREIGN KEY (leilao_leilaoid) R
 ALTER TABLE vendedor ADD CONSTRAINT vendedor_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 ALTER TABLE comprador ADD CONSTRAINT comprador_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
+ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
 ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
