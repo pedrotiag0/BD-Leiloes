@@ -1196,7 +1196,30 @@ def getAdminStats():
 
     return jsonify(resposta)
 
+@app.route("/dbproj/versoes/<leilaoid>", methods=['GET'])
+def getVersoesLeilao(leilaoid):
+    logger.info("###              BD [GET OLD AUCTION VERSIONS]: GET /dbproj/versoes/<leilaoid>              ###")
 
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT versaoid, titulo, descricao FROM versao WHERE leilao_leilaoid = %s", (leilaoid,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    payload = []
+    logger.debug("---- Versoes Leiloes  ----")
+    for row in rows:
+        logger.debug(row)
+        content = {'versaoId': int(row[0]), 'titulo': row[1], 'descricao': row[2]}
+        payload.append(content)  # appending to the payload to be returned
+
+    conn.close()
+    return jsonify(payload)
 
 def getUserIdByAuthCode(authCode):
     userId = None
