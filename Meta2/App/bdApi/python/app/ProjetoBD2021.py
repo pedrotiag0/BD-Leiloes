@@ -353,6 +353,12 @@ def criaLeilao():
     logger.info("###              BD [Insert Auction]: POST /dbproj/leilao              ###");
     payload = request.get_json()
 
+    #TODO -> ALTERAR PARA GET VENDEDOR BY AUTH CODE
+    vendedorID = getUserIdByAuthCode(payload["vendedorID"])
+    if (vendedorID[0] == None):
+        return jsonify(erro=vendedorID[1])
+    vendedorID = vendedorID[0]
+
     conn = db_connection()
     cur = conn.cursor()
 
@@ -368,14 +374,13 @@ def criaLeilao():
     try:
         values = (
             payload["leilaoPrecoMinimo"], payload["leilaoTitulo"], payload["leilaoDescricao"], payload["leilaoDataFim"],
-            payload["artigoId"], payload["nomeArtigo"], payload["vendedorID"])
+            payload["artigoId"], payload["nomeArtigo"], vendedorID)
     except Exception as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
 
     try:
         precoMin = int(payload["leilaoPrecoMinimo"])
-        idVendedor = int(payload["vendedorID"])
     except (Exception, ValueError) as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
@@ -730,6 +735,11 @@ def banUser():
     logger.info("###              BD [Ban User Auction]: Put /dbproj/leilao/ban/<userid>             ###");
 
     payload = request.get_json()
+
+    adminID = getAdminIdByAuthCode(payload['adminID'])
+    userID = getUserIdByAuthCode(payload['userID'])
+
+
     conn = db_connection()
     cur = conn.cursor()
 
@@ -747,7 +757,7 @@ def banUser():
           "WHERE userid = %s"
 
     try:
-        values = (payload['adminID'], payload['userID'])
+        values = (adminID, userID)
     except (Exception, ValueError) as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
@@ -772,7 +782,7 @@ def banUser():
           "WHERE vendedor_utilizador_userid = %s AND datafim > (NOW() + INTERVAL '1 hours')"
 
     try:
-        values = [payload['userID']]
+        values = userID
         cur.execute(sql, values)
         rows = cur.fetchall()
 
@@ -784,7 +794,7 @@ def banUser():
                   "SET admincancelou = %s " \
                   "WHERE vendedor_utilizador_userid = %s"
 
-            values = (payload['adminID'], payload['userID'])
+            values = (adminID, userID)
             try:
                 cur.execute(sql, values)
                 cur.execute("commit")
@@ -803,7 +813,7 @@ def banUser():
           "SET valida = false " \
           "WHERE comprador_utilizador_userid = %s"
 
-    values = [payload['userID']]
+    values = userID
     affected_rows = 0
     try:
         cur.execute(sql, values)
@@ -822,7 +832,7 @@ def banUser():
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
         sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
-        values = [payload['userID']]
+        values = userID
         cur.execute(sql ,values)
         rows = cur.fetchall()
 
@@ -831,7 +841,7 @@ def banUser():
             logger.debug(f'LEILAO ID: {leilaoID}, TYPE: {type(leilaoID)}')
 
             sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s "
-            sqlValues = (payload['userID'], leilaoID)
+            sqlValues = (userID, leilaoID)
             cur.execute(sqlQuery, sqlValues)
             maxValueUser = cur.fetchall()[0]
 
@@ -867,8 +877,8 @@ def banUser():
                         "VALUES (%s, NOW() + INTERVAL '1 hours', %s , %s)"
 
             try:
-                comentario = f"Lamentamos o incomodo mas o utilizador {payload['userID']} foi banido do leilao {leilaoID}"
-                values = (comentario, payload['userID'], leilaoID)
+                comentario = f"Lamentamos o incomodo mas o utilizador {userID} foi banido do leilao {leilaoID}"
+                values = (comentario, userID, leilaoID)
             except (Exception, ValueError) as error:
                 codigoErro = '003'
                 return jsonify(erro=codigoErro)
@@ -881,7 +891,7 @@ def banUser():
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
 
-            comentario = f"Utilizador {payload['userID']} foi banido do leilao {leilaoID}"
+            comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
             sqlQuery = "INSERT INTO notificacao (comentario, momento, utilizador_userid) "\
                         "SELECT %s, NOW(), comprador_utilizador_userid " \
                        "FROM licitacao WHERE leilao_leilaoid = %s"
