@@ -63,7 +63,7 @@ CREATE TABLE versao (
 	titulo		 VARCHAR(64) NOT NULL,
 	descricao	 VARCHAR(512),
 	leilao_leilaoid BIGINT,
-	PRIMARY KEY(leilao_leilaoid)
+	PRIMARY KEY(versaoid)
 );
 
 CREATE TABLE notificacao (
