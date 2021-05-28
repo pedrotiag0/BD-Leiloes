@@ -71,6 +71,7 @@ CREATE TABLE notificacao (
 	comentario	 VARCHAR(512) NOT NULL,
 	momento		 TIMESTAMP NOT NULL,
 	utilizador_userid BIGINT NOT NULL,
+	leilao_leilaoid	 BIGINT NOT NULL,
 	PRIMARY KEY(id)
 );
 
