@@ -78,6 +78,138 @@ def addUser():
         return jsonify(erro=codigoErro)
 
 
+@app.route("/dbproj/vendedor", methods=['POST'])
+def addVendedor():
+    logger.info("###              BD [Insert Seller]: POST /dbproj/vendedor              ###")
+    payload = request.get_json()
+    headers = request.headers
+    logger.info("---- new vendedor  ----")
+    logger.debug(f'payload: {payload}')
+
+    try:
+        authCode = headers['authToken']
+        moradaEnvio = payload['moradaEnvio']
+        if(len(moradaEnvio)>128):
+            codigoErro = '002'  # Payload incorreto (nome das variaveis)
+            return jsonify(erro=codigoErro)
+    except (Exception) as error:
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("INSERT INTO vendedor (moradaenvio, utilizador_userid) VALUES (%s , %s) RETURNING utilizador_userid", (moradaEnvio, userId,))
+        sucess = True
+        novoVendedorId = str(cur.fetchone()[0])
+        cur.execute("commit")
+    except psycopg2.IntegrityError:
+        sucess = False
+        codigoErro = '016'  # Vendedor Duplicado
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+    if (sucess):
+        return jsonify(vendedorId=novoVendedorId)
+    else:
+        return jsonify(erro=codigoErro)
+
+@app.route("/dbproj/comprador", methods=['POST'])
+def addComprador():
+    logger.info("###              BD [Insert Buyer]: POST /dbproj/comprador              ###")
+    payload = request.get_json()
+    headers = request.headers
+    logger.info("---- new comprador  ----")
+    logger.debug(f'payload: {payload}')
+
+    try:
+        authCode = headers['authToken']
+        moradaRececao = payload['moradaRececao']
+        if(len(moradaRececao)>128):
+            codigoErro = '002'  # Payload incorreto (nome das variaveis)
+            return jsonify(erro=codigoErro)
+    except (Exception) as error:
+        codigoErro = '003'  # Payload incorreto (nome das variaveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("INSERT INTO comprador (moradarececao, utilizador_userid) VALUES (%s , %s) RETURNING utilizador_userid", (moradaRececao, userId,))
+        sucess = True
+        novoCompradorId = str(cur.fetchone()[0])
+        cur.execute("commit")
+    except psycopg2.IntegrityError:
+        sucess = False
+        codigoErro = '017'  # Comprador Duplicado
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+    if (sucess):
+        return jsonify(compradorId=novoCompradorId)
+    else:
+        return jsonify(erro=codigoErro)
+
+@app.route("/dbproj/admin", methods=['POST'])
+def addAdmin():
+    logger.info("###              BD [Insert Admin]: POST /dbproj/admin              ###")
+    headers = request.headers
+    logger.info("---- new admin  ----")
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '002'  # Payload/Header incorreto (nome/tamanho das variáveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+        return jsonify(erro=userId[1])
+    userId = userId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("INSERT INTO administrador (utilizador_userid) VALUES (%s) RETURNING utilizador_userid", (userId,))
+        sucess = True
+        novoAdminId = str(cur.fetchone()[0])
+        cur.execute("commit")
+    except psycopg2.IntegrityError:
+        sucess = False
+        codigoErro = '018'  # Administrador Duplicado
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+    if (sucess):
+        return jsonify(adminId=novoAdminId)
+    else:
+        return jsonify(erro=codigoErro)		
+		
 @app.route("/dbproj/user", methods=['PUT'])
 def loginUser():
     logger.info("###              BD [Login User]: PUT /dbproj/user              ###");
