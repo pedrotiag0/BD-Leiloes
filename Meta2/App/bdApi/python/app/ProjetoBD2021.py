@@ -1504,7 +1504,7 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-	with open('dbPass.txt') as f:
+    with open('dbPass.txt') as f:
         password = f.readlines()
     passwordDesencriptada = desencriptaPass(password[0])
 	
