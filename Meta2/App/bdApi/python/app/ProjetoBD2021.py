@@ -488,7 +488,7 @@ def getDetailsAuction(leilao_leilaoid):
                 content = {'id': int(row[0]), 'comentario': row[1], 'momento': row[2], 'username': row[3]}
                 payload.append(content)  # appending to the payload to be returned
 
-            sql = "SELECT id, valor, username " \
+            sql = "SELECT id, valor, valida, username " \
                   "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
             cur.execute(sql, f'{leilao_leilaoid}')
             rows = cur.fetchall()
@@ -502,7 +502,7 @@ def getDetailsAuction(leilao_leilaoid):
             sucess = True
             for row in rows:
                 logger.debug(row)
-                content = {'id': int(row[0]), 'valor': row[1], 'username': row[2]}
+                content = {'id': int(row[0]), 'valor': row[1], 'valida': row[2],'username': row[3]}
                 payload.append(content)  # appending to the payload to be returned
 
         except (Exception, psycopg2.DatabaseError) as error:
