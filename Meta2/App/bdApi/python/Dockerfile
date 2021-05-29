@@ -15,6 +15,8 @@ run pip install flask
 
 run pip install pyjwt
 
+run pip install cryptography
+
 run pip install psycopg2-binary
 
 copy . /app
