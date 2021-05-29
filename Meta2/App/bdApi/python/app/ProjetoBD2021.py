@@ -1,9 +1,16 @@
 from flask import Flask, jsonify, request
+from passlib.context import CryptContext
 import logging, psycopg2, time, jwt, datetime
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 KEY = "b96ZhIxcBdxNPDn4WRzDueMMqyux3k7g"
+
+pwd_context = CryptContext(
+        schemes=["pbkdf2_sha256"],
+        default="pbkdf2_sha256",
+        pbkdf2_sha256__default_rounds=30000
+)
 
 
 @app.route('/')
@@ -57,6 +64,8 @@ def addUser():
     if not ((32 >= len(values[0]) > 0) and (64 >= len(values[1]) > 0) and (32 >= len(values[2]) > 0)):
         codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
+
+    values = (values[0], values[1], pwd_context.encrypt(values[2]))
 
     try:
         cur.execute(statement, values)
@@ -210,7 +219,8 @@ def addAdmin():
         return jsonify(adminId=novoAdminId)
     else:
         return jsonify(erro=codigoErro)		
-		
+
+
 @app.route("/dbproj/user", methods=['PUT'])
 def loginUser():
     logger.info("###              BD [Login User]: PUT /dbproj/user              ###");
@@ -235,16 +245,20 @@ def loginUser():
         codigoErro = '002'  # Payload incorreto
         return jsonify(erro=codigoErro)
 
-    cur.execute("SELECT userid FROM utilizador WHERE username = %s and password = %s", (username, password))
+    cur.execute("SELECT userid, password FROM utilizador WHERE username = %s", (username,))
     rows = cur.fetchall()
 
     if len(rows) == 0:
         codigoErro = '004'  # Credenciais incorretas
         return jsonify(erro=codigoErro)
 
-    userid = rows[0][0]
+    hashed = rows[0][1]
+    if not pwd_context.verify(password, hashed):
+        codigoErro = '004'  # Credenciais incorretas
+        return jsonify(erro=codigoErro)
 
-    time_limit = datetime.datetime.utcnow() + datetime.timedelta(minutes=30)  # set limit for user
+    userid = rows[0][0]
+    time_limit = datetime.datetime.utcnow() + datetime.timedelta(hours=1) + datetime.timedelta(minutes=30)  # set limit for user
     payload = {"userid": rows[0][0], "exp": time_limit}
     token = jwt.encode(payload, KEY)
 
