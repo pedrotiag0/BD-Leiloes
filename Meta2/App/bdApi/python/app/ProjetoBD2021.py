@@ -1466,9 +1466,23 @@ def getVendedorIdByAuthCode(authCode):
     return vendedorId
 
 
+def desencriptaPass(password):
+    passwordDesencriptada = ""
+    alphabet = "abcdefghijklmnopqrstuvwxyz"
+    for c in password:
+        if c in alphabet:
+            position = alphabet.find(c)
+            new_position = (position - 5) % 26
+            new_character = alphabet[new_position]
+            passwordDesencriptada += new_character
+        else:
+            passwordDesencriptada += c
+
+    return passwordDesencriptada
+
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
-                          password="aulaspl",
+                          password=passwordDesencriptada,
                           host="db",
                           port="5432",
                           database="bdLeiloes")
@@ -1490,6 +1504,10 @@ if __name__ == "__main__":
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+	with open('dbPass.txt') as f:
+        password = f.readlines()
+    passwordDesencriptada = desencriptaPass(password[0])
+	
     time.sleep(1)  # just to let the DB start before this print :-)
 
     logger.info("\n---------------------------------------------------------------\n" +
