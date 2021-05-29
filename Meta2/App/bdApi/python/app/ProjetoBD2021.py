@@ -1143,7 +1143,7 @@ def getAdminStats():
         codigoErro = '003'  # Input Invalido
         return jsonify(erro=codigoErro)
 
-    adminId = getUserIdByAuthCode(authCode)
+    adminId = getAdminIdByAuthCode(authCode)
     if (adminId[0] == None):
         return jsonify(erro=adminId[1])
     adminId = adminId[0]
