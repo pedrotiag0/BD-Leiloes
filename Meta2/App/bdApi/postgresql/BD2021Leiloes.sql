@@ -2,9 +2,9 @@ CREATE TABLE utilizador (
 	userid	 SERIAL,
 	username	 VARCHAR(32) UNIQUE NOT NULL,
 	email	 VARCHAR(64) UNIQUE NOT NULL,
-	password	 VARCHAR(32) NOT NULL,
+	password	 VARCHAR(512) NOT NULL,
 	adminbaniu BIGINT,
-	authtoken	 VARCHAR(4096),
+	authtoken	 VARCHAR(512),
 	PRIMARY KEY(userid)
 );
 
