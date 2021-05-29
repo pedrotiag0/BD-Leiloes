@@ -651,7 +651,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
     try:
         leilaoID = int(leilao_leilaoid)
     except (Exception, ValueError) as error:
-        codigoErro = '003'  # NAO É NUMERO
+        codigoErro = '003'  # NAO E NUMERO
         return jsonify(erro=codigoErro)
 
     try:
@@ -741,7 +741,14 @@ def banUser():
     authCode = headers["authToken"]
 
     adminID = getAdminIdByAuthCode(authCode)
+    if (adminID[0] == None):
+        return jsonify(erro=adminID[1])
+    adminID = adminID[0]
+
     userID = getUserIdByAuthCode(payload['userID'])
+    if (userID[0] == None):
+        return jsonify(erro=userID[1])
+    compradorId = userID[0]
 
 
     conn = db_connection()
