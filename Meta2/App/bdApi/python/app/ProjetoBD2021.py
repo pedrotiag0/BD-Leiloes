@@ -1274,6 +1274,104 @@ def getVersoesLeilao(leilaoid):
     conn.close()
     return jsonify(payload)
 
+@app.route("/dbproj/terminarLeiloes", methods=['PUT'])
+def terminarLeiloes():
+    logger.info("###              BD [END AUCTIONS]: PUT /dbproj/terminarLeiloes              ###")
+
+    headers = request.headers
+    payload = request.get_json()
+    try:
+        authCode = headers['authToken']
+        idLeilao = payload['idLeilao']
+    except (Exception, ValueError) as error:
+        codigoErro = '003'  # Input Invalido
+        return jsonify(erro=codigoErro)
+
+    vendedorId = getVendedorIdByAuthCode(authCode)  # Verifica se se trata de um vendedor registado
+    if (vendedorId[0] == None):
+        return jsonify(erro=vendedorId[1])
+    vendedorId = vendedorId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # Verificar se se trata do dono do leilao
+    try:
+        cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE leilaoid = %s AND vendedor_utilizador_userid = %s", (idLeilao,vendedorId,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    if(rows[0][0] != 1):
+        conn.close()
+        jsonify(erro='021')
+
+    # Verificar Estado do Leilao
+    try:
+        cur.execute("SELECT precominimo, maiorlicitacao, admincancelou, titulo, nomeartigo FROM leilao WHERE leilaoid = %s AND datafim < (NOW() + INTERVAL '1 hours')", (idLeilao,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+    precoMinimo = rows[0][0]
+    maiorLicitacao = rows[0][1]
+    adminCancelou = rows[0][2]
+    tituloLeilao = rows[0][3]
+    nomeArtigo = rows[0][4]
+    if(len(rows)==0):
+        conn.close()
+        return jsonify(erro='023')
+    elif(adminCancelou != None):                   # adminCancelou
+        conn.close()
+        return jsonify({'leilaoId': idLeilao, 'Cancelado': rows[0][2]})
+    elif(precoMinimo > maiorLicitacao):
+        conn.close()
+        return jsonify({'leilaoId': idLeilao, 'aviso': 'nenhum vencedor'})
+
+
+    statement = "SELECT userid, username FROM utilizador, licitacao " \
+                "WHERE comprador_utilizador_userid = userid AND valor = %s " \
+                "AND valida = true AND leilao_leilaoid = %s"
+
+    try:
+        cur.execute(statement, (maiorLicitacao, idLeilao,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+
+    rows = cur.fetchall()
+    idVencedor = rows[0][0]
+    usernameVencedor = rows[0][1]
+
+    # ENVIAR NOTIFICACAO AOS PARTICIPANTES E VENCEDOR
+    statement = "INSERT INTO notificacao (utilizador_userid, momento, leilao_leilaoid, comentario)" \
+                " SELECT comprador_utilizador_userid, (NOW() + INTERVAL '1 hours'), %s," \
+                " CASE WHEN comprador_utilizador_userid = %s THEN %s" \
+                " ELSE %s" \
+                " END AS comentario" \
+                " FROM licitacao" \
+                " WHERE leilao_leilaoid = %s;"
+
+    try:
+        comentarioVencedor = "Parabens " + usernameVencedor + " venceu o leilao " + tituloLeilao + " e como tal ganhou o seguinte artigo: " + nomeArtigo +"."
+        comentarioPerdedor = "Que pena! Não foi vencedor do leilao " + tituloLeilao + "."
+        cur.execute(statement, (idLeilao, idVencedor, comentarioVencedor, comentarioPerdedor, idLeilao,))
+        cur.execute("commit")
+        # return jsonify((idLeilao, idVencedor, comentarioVencedor, comentarioPerdedor,)) # DEBUG
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        return jsonify(erro='999')
+
+    if conn is not None:
+        conn.close()
+
+    return jsonify({'leilaoId': idLeilao, 'vencedor': usernameVencedor})
+
+	
 def getUserIdByAuthCode(authCode):
     userId = None
 
