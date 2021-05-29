@@ -2,9 +2,9 @@ CREATE TABLE utilizador (
 	userid	 SERIAL,
 	username	 VARCHAR(32) UNIQUE NOT NULL,
 	email	 VARCHAR(64) UNIQUE NOT NULL,
-	password	 VARCHAR(32) NOT NULL,
+	password	 VARCHAR(512) NOT NULL,
 	adminbaniu BIGINT,
-	authtoken	 VARCHAR(4096),
+	authtoken	 VARCHAR(512),
 	PRIMARY KEY(userid)
 );
 
@@ -85,4 +85,4 @@ ALTER TABLE vendedor ADD CONSTRAINT vendedor_fk1 FOREIGN KEY (utilizador_userid)
 ALTER TABLE comprador ADD CONSTRAINT comprador_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
 ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
-ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
+ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk2 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
