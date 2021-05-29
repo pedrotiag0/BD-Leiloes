@@ -796,7 +796,7 @@ def banUser():
         return jsonify(erro=codigoErro)
 
     try:
-        cur.execute(sql, values)
+        cur.execute(sql, (adminID, userID,))
         cur.execute("commit")
         #sucess = True
         #logger.debug("---- Auction Details  ----")
@@ -934,11 +934,11 @@ def banUser():
                 codigoErro = '999'  # Erro nao identificado
 
             comentario = f"Utilizador {userId} foi banido do leilao {leilaoID}"
-            sqlQuery = "INSERT INTO notificacao (comentario, momento, utilizador_userid) "\
-                        "SELECT %s, NOW(), comprador_utilizador_userid " \
+            sqlQuery = "INSERT INTO notificacao (comentario, momento, leilao_leilaoid, utilizador_userid) "\
+                        "SELECT %s, NOW(), %s ,comprador_utilizador_userid " \
                        "FROM licitacao WHERE leilao_leilaoid = %s"
 
-            values = (comentario, leilaoID)
+            values = (comentario, leilaoID, leilaoID)
             try:
                 cur.execute(sqlQuery, values)
                 cur.execute("commit")
@@ -948,9 +948,6 @@ def banUser():
                 codigoErro = '999'  # Erro nao identificado
 
             # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
-
-
-
 
     try:
         sucess = True
