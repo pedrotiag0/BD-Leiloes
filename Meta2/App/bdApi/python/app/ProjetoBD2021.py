@@ -1323,7 +1323,7 @@ def getVendedorIdByAuthCode(authCode):
         cur.execute("SELECT utilizador_userid FROM vendedor, utilizador  WHERE authToken = %s AND utilizador_userid = userid", (authCode,))
         rows = cur.fetchall()
         if(len(rows) != 1):
-            codigoErro = '014'  # Utilizador nao e um comprador/não existe
+            codigoErro = '022'  # Utilizador nao e um vendedor/não existe
             return (None, codigoErro)
         vendedorId = rows[0]
     except (Exception, psycopg2.DatabaseError) as error:
