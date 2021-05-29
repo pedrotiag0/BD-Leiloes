@@ -372,6 +372,7 @@ def criaLeilao():
                           VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s) RETURNING leilaoid """
 
     # VERIFICACOES
+
     try:
         values = (
             payload["leilaoPrecoMinimo"], payload["leilaoTitulo"], payload["leilaoDescricao"], payload["leilaoDataFim"],
@@ -382,11 +383,13 @@ def criaLeilao():
 
     try:
         precoMin = int(payload["leilaoPrecoMinimo"])
+        d = datetime.datetime.strptime( payload["leilaoDataFim"], "%Y-%m-%d %H:%M")
+
     except (Exception, ValueError) as error:
-        codigoErro = '003'
+        codigoErro = '002'
         return jsonify(erro=codigoErro)
 
-    if not ((64 >= len(values[1]) > 0) and (512 >= len(values[2]) > 0) and (10 >= len(values[4]) > 0) and (
+    if not ((64 >= len(values[1]) > 0) and (512 >= len(values[2]) > 0) and (len(values[4]) == 10) and (
             64 >= len(values[5]) > 0)):
         if (checkIdUtilizador(values[6]) != True):
             codigoErro = '009'  # ID Vendedor inexistente
@@ -748,7 +751,7 @@ def banUser():
     userID = getUserIdByAuthCode(payload['userID'])
     if (userID[0] == None):
         return jsonify(erro=userID[1])
-    compradorId = userID[0]
+    userId = userID[0]
 
 
     conn = db_connection()
@@ -796,6 +799,7 @@ def banUser():
         values = userID
         cur.execute(sql, values)
         rows = cur.fetchall()
+        logger.debug(f'USER ID: {userID}')
 
         if len(rows) == 0: # Significa que nao esta a vender nada atualmente
             codigoErro = '008' # User nao tem leiloes a decorrer
@@ -816,7 +820,7 @@ def banUser():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'
-        logger.debug('SAIII:')
+
         return jsonify(erro=codigoErro)
 
     # Verificar se o user a banir tem alguma licitacao e invalida-la
@@ -883,12 +887,24 @@ def banUser():
                     codigoErro = '999'
                     return jsonify(erro=codigoErro)
 
+                # DEPOIS DE ALTERAR OS VALORES DA LICITACAO TENHO DE ALTERAR O VALOR DA MAIOR LICITACAO DO LEILAO
+                sql = "UPDATE leilao SET maiorlicitacao = %s WHERE leilaoid = %s"
+                values = (maxValueUser, leilaoID)
+                try:
+                    cur.execute(sql, values)
+                    cur.execute("commit")
+                except (Exception, psycopg2.DatabaseError) as error:
+                    logger.error(error)
+                    codigoErro = '999'
+                    return jsonify(erro=codigoErro)
+
+
             # Colocar no mural dos leiloes uma msg de incomodo e paa cada utilizador enviar uma notificacao
             sqlQuery = "INSERT INTO mensagem (comentario, momento, utilizador_userid, leilao_leilaoid)" \
                         "VALUES (%s, NOW() + INTERVAL '1 hours', %s , %s)"
 
             try:
-                comentario = f"Lamentamos o incomodo mas o utilizador {userID} foi banido do leilao {leilaoID}"
+                comentario = f"Lamentamos o incomodo mas o utilizador {userId} foi banido do leilao {leilaoID}"
                 values = (comentario, userID, leilaoID)
             except (Exception, ValueError) as error:
                 codigoErro = '003'
@@ -902,7 +918,7 @@ def banUser():
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
 
-            comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
+            comentario = f"Utilizador {userId} foi banido do leilao {leilaoID}"
             sqlQuery = "INSERT INTO notificacao (comentario, momento, utilizador_userid) "\
                         "SELECT %s, NOW(), comprador_utilizador_userid " \
                        "FROM licitacao WHERE leilao_leilaoid = %s"
@@ -915,7 +931,10 @@ def banUser():
                 logger.error(error)
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
-            # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAIXIMA ENTAO CONTA A SEGUNDA MELHOR
+
+            # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
+
+
 
 
     try:
