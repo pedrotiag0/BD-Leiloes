@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import logging, psycopg2, time, jwt, datetime
 
 app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
 KEY = "b96ZhIxcBdxNPDn4WRzDueMMqyux3k7g"
 
 
