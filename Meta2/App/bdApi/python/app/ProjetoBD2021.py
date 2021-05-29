@@ -569,12 +569,6 @@ def make_bidding(leilaoId, licitacao):
         return jsonify(erro=codigoErro)
 
     try:
-        sql = "UPDATE leilao " \
-              "SET maiorlicitacao = %s" \
-              "WHERE leilaoid = %s "
-        values = (licitacao, leilaoId)
-        cur.execute(sql, values)
-
         sql = "INSERT INTO licitacao (valor, momento, comprador_utilizador_userid, leilao_leilaoid)" \
               "VALUES (%s,  %s,  %s,  %s)"
         values = (licitacao, datetime.datetime.now(), compradorId, leilaoId)

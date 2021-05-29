@@ -92,12 +92,16 @@ CREATE OR REPLACE FUNCTION BidNotification() RETURNS trigger
 LANGUAGE plpgsql
 as $$
 BEGIN
+	-- Envia notificacoes
 	INSERT INTO notificacao(comentario, momento, leilao_leilaoid, utilizador_userid)
 	SELECT 'Licitacao ultrapassada pelo user '||new.comprador_utilizador_userid||', com o valor de '||new.valor, NOW() + INTERVAL '1 hours', new.leilao_leilaoid, comprador_utilizador_userid
 	FROM licitacao
 	WHERE comprador_utilizador_userid != new.comprador_utilizador_userid
 		AND valor < new.valor
 		AND leilao_leilaoid = new.leilao_leilaoid AND valida = true;
+	
+	-- Atualiza leilao
+	UPDATE leilao SET maiorlicitacao = new.valor WHERE leilaoid = new.leilao_leilaoid;
     RETURN new;
 END;
 $$;
