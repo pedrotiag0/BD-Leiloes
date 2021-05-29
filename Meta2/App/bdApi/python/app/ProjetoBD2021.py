@@ -1120,6 +1120,7 @@ def get_inbox():
 
     cur.execute("SELECT leilao_leilaoid, comentario, momento FROM notificacao WHERE utilizador_userid = %s", (userId,))
     rows = cur.fetchall()
+    payload = []
     for row in rows:
         #"LeilaoId": 7, "Aviso": “Licitação ultrapassada.”, "Momento": "2021-05-27 19:13:49"
         content = {'LeilaoId': row[0], 'Aviso': row[1], 'Momento': row[2]}
@@ -1132,7 +1133,6 @@ def get_inbox():
                 "ORDER BY momento DESC"
                 , (userId, userId))
     rows = cur.fetchall()
-    payload = []
     for row in rows:
         #“Username”: “User1”, "LeilaoId": 2, "Momento": "2021-05-27 11:17:54", "Comentario": “oi”
         content = {'Username': row[0], 'LeilaoId': row[1], 'Comentario': row[2], 'Momento': row[3]}
