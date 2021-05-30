@@ -356,8 +356,6 @@ def get_auction(keyword):
     cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and LOWER(descricao) LIKE %s",
                 (query,))
     rows = cur.fetchall()
-    logger.debug(f'aqui')
-
 
     if len(rows) == 0:
 
