@@ -246,7 +246,7 @@ def loginUser():
     conn = db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT userid, password FROM utilizador WHERE username = %s", (username,))
+    cur.execute("SELECT userid, password FROM utilizador WHERE username = %s AND adminbaniu IS NULL", (username,))
     rows = cur.fetchall()
 
     if len(rows) == 0:
