@@ -129,6 +129,26 @@ AFTER UPDATE OF titulo, descricao ON leilao
 FOR EACH ROW
 EXECUTE PROCEDURE newVersionLeilao();
 
+-- Trigger que notifica automaticamente os utilizadores que licitaram num leilao que foi banido
+CREATE OR REPLACE FUNCTION canceledAuctionNotify() RETURNS trigger
+LANGUAGE plpgsql
+as $$
+BEGIN
+	-- Envia notificacoes
+	INSERT INTO notificacao(comentario, momento, leilao_leilaoid, utilizador_userid)
+	SELECT DISTINCT on (comprador_utilizador_userid) 'Lamentamos, mas o leilao '||old.titulo||' foi cancelado pelo admin userid:'||new.admincancelou||'. Pelo que as licitacoes terminaram e nao ha vencedor!', NOW() + INTERVAL '1 hours', old.leilaoid, comprador_utilizador_userid
+	FROM licitacao
+	WHERE leilao_leilaoid = old.leilaoid AND valida = true;
+    RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tLeilaoCancelado on leilao;
+CREATE TRIGGER tLeilaoCancelado
+AFTER UPDATE OF admincancelou ON leilao
+FOR EACH ROW
+EXECUTE PROCEDURE canceledAuctionNotify();
+
 -- Popular Base de Dados
 insert into utilizador (username, email, password, adminbaniu, authtoken)
 values  ('user1', 'user1@email2.com', '$pbkdf2-sha256$30000$Z2yNMaa0Vsr5n/Nei1EKoQ$QaWn1eEW0I4kmX81uP0zTN0PP30nxu3GYG00dyje6Yo', null, 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjEsImV4cCI6MTYyMjI5NTcyN30.3kfRFmZoJj1qb183rv6f0JAtVOQ6gBy8LV4c8SHBYmI'),
