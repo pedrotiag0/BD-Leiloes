@@ -773,7 +773,7 @@ def banUser():
 
     # Colocar ID Admin na tabela utilizador na linha do user a banir
     sql = "UPDATE utilizador " \
-          "SET adminbaniu = %s " \
+          "SET adminbaniu = %s , authtoken = null " \
           "WHERE userid = %s"
 
     try:
@@ -787,7 +787,7 @@ def banUser():
         return jsonify(erro=codigoErro)
 
     try:
-        cur.execute(sql, (adminID, userID,))
+        cur.execute(sql, (adminID, userID, ))
         affected_rows = cur.rowcount
         cur.execute("commit")
         #sucess = True
@@ -858,7 +858,7 @@ def banUser():
 
     if affected_rows == 0: #Significa que o user nao tinha licitacoes
         codigoErro = '019'
-        return jsonify(erro=codigoErro)
+        #return jsonify(erro=codigoErro)
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
         sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
@@ -881,6 +881,7 @@ def banUser():
             if  maxValueUser < maxBidAuction: #invalidar todas as licitacoes entre estes 2 valores e colocar a maior licitacao com o valor do user a banir
                 sqlQuery = "UPDATE licitacao SET valida = "\
                                         "CASE " \
+                                            "WHEN valida = false THEN false "\
                                             "WHEN valor = %s THEN true " \
                                             "WHEN valor >= %s AND valor < %s THEN false " \
                                             "ELSE true "\
