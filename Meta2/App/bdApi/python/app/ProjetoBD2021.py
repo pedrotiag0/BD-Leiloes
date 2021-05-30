@@ -671,6 +671,110 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         jsonify(erro='021')
 
     sql = "SELECT leilaoid, titulo, descricao " \
+          "FROM leilao WHERE leilaoid = %s "
+
+    try:
+        cur.execute(sql, (leilao_leilaoid,))
+
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            codigoErro = '002'  # Input invalido
+            conn.close()
+            return jsonify(erro=codigoErro)
+
+        newTitle = payload['novoTitulo']
+        newDescription = payload['novaDescricao']
+        for row in rows:
+            leilaoID = int(row[0])
+            currentTitle = row[1]
+            currentDescription = row[2]
+
+        if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
+            codigoErro = '002'  # Input Invalido
+            return jsonify(erro=codigoErro)
+
+        if len(newTitle) == 0:
+            newTitle = currentTitle
+
+        if len(newDescription) == 0:
+            newDescription = currentDescription
+
+        if len(newTitle) == 0 and len(newDescription) == 0 or currentTitle == newTitle and currentDescription == newDescription:
+            codigoErro = '002'  # As alteracoes estao vazias/iguais e nao se altera nada
+            return jsonify(erro=codigoErro)
+
+        sql = "UPDATE leilao " \
+              "SET titulo = %s,  descricao = %s " \
+              "WHERE leilaoid = %s "
+
+        values = (newTitle, newDescription, leilao_leilaoid)
+        try:
+            cur.execute(sql, values)
+            # LEILAO ORIGINAL COLOCADO NA TABELA DE VERSAO ATRAVES DE UM TRIGGER
+            cur.execute("commit")
+            sucess = True
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(error)
+            codigoErro = '999'
+            cur.execute("rollback")
+            conn.close()
+            return jsonify(erro=codigoErro)
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        sucess = False
+        codigoErro = '999'  # Erro nao identificado
+    finally:
+        if conn is not None:
+            conn.close()
+
+        if sucess:
+            return jsonify(payload)
+        else:
+            return jsonify(erro=codigoErro)
+    codigoErro = ''
+    sucess = False
+    logger.info(
+        "###              BD [Change Auction Properties]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
+
+    payload = request.get_json()
+    headers = request.headers
+    try:
+        leilaoID = int(leilao_leilaoid)
+        authCode = headers['authToken']
+    except (Exception, ValueError) as error:
+        codigoErro = '003'  # NAO E NUMERO
+        return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # Verifica se se trata do dono deste leilao
+    vendedorId = getVendedorIdByAuthCode(authCode)  # Verifica se se trata de um vendedor registado
+    if (vendedorId[0] == None):
+        return jsonify(erro=vendedorId[1])
+    vendedorId = vendedorId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # Verificar se se trata do dono do leilao
+    try:
+        cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE leilaoid = %s AND vendedor_utilizador_userid = %s",
+                    (leilao_leilaoid, vendedorId,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        conn.close()
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    if (rows[0][0] != 1):
+        conn.close()
+        jsonify(erro='021')
+
+    sql = "SELECT leilaoid, titulo, descricao " \
           "FROM leilao WHERE leilaoid = %s FOR UPDATE"
 
     try:
@@ -1024,6 +1128,7 @@ def cancel_auction(leilaoId):
 
     try:
         cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
+		# TRIGGER ENVIA NOTIFICACOES
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         cur.execute("rollback")
