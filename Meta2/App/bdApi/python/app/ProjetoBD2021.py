@@ -671,7 +671,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         jsonify(erro='021')
 
     sql = "SELECT leilaoid, titulo, descricao " \
-          "FROM leilao WHERE leilaoid = %s "
+          "FROM leilao WHERE leilaoid = %s FOR UPDATE"
 
     try:
         cur.execute(sql, (leilao_leilaoid,))
@@ -680,6 +680,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if len(rows) == 0:
             codigoErro = '002'  # Input invalido
+            cur.execute("rollback")
             conn.close()
             return jsonify(erro=codigoErro)
 
@@ -692,6 +693,8 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
         if len(newTitle) == 0:
@@ -702,6 +705,8 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if len(newTitle) == 0 and len(newDescription) == 0 or currentTitle == newTitle and currentDescription == newDescription:
             codigoErro = '002'  # As alteracoes estao vazias/iguais e nao se altera nada
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
         sql = "UPDATE leilao " \
