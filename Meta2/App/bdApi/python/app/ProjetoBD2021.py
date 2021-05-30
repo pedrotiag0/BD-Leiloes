@@ -42,19 +42,10 @@ def addUser():
     logger.info("###              BD [Insert User]: POST /dbproj/user              ###");
     payload = request.get_json()
 
-    conn = db_connection()
-    cur = conn.cursor()
-
     logger.info("---- new user  ----")
     logger.debug(f'payload: {payload}')
 
-    # Validacoes
-
     # parameterized queries, good for security and performance
-    statement = """
-                  INSERT INTO utilizador (username, email, password) 
-                          VALUES ( %s,   %s ,   %s ) RETURNING userid"""
-
     try:
         values = (payload["username"], payload["email"], payload["password"])
     except (Exception) as error:
@@ -65,7 +56,14 @@ def addUser():
         codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
 
+    statement = """
+                  INSERT INTO utilizador (username, email, password) 
+                          VALUES ( %s,   %s ,   %s ) RETURNING userid"""
+
     values = (values[0], values[1], pwd_context.encrypt(values[2]))
+
+    conn = db_connection()
+    cur = conn.cursor()
 
     try:
         cur.execute(statement, values)
