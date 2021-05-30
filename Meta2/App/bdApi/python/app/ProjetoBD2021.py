@@ -632,9 +632,10 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         "###              BD [Change Auction Properties]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
 
     payload = request.get_json()
-
+    headers = request.headers
     try:
         leilaoID = int(leilao_leilaoid)
+        authCode = headers['authToken']
     except (Exception, ValueError) as error:
         codigoErro = '003'  # NAO E NUMERO
         return jsonify(erro=codigoErro)
@@ -642,11 +643,35 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
     conn = db_connection()
     cur = conn.cursor()
 
+    # Verifica se se trata do dono deste leilao
+    vendedorId = getVendedorIdByAuthCode(authCode)  # Verifica se se trata de um vendedor registado
+    if (vendedorId[0] == None):
+        return jsonify(erro=vendedorId[1])
+    vendedorId = vendedorId[0]
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # Verificar se se trata do dono do leilao
+    try:
+        cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE leilaoid = %s AND vendedor_utilizador_userid = %s",
+                    (leilao_leilaoid, vendedorId,))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        conn.close()
+        return jsonify(erro='999')
+
+    rows = cur.fetchall()
+
+    if (rows[0][0] != 1):
+        conn.close()
+        jsonify(erro='021')
+
     sql = "SELECT leilaoid, titulo, descricao " \
           "FROM leilao WHERE leilaoid = %s "
 
     try:
-        cur.execute(sql, f'{leilao_leilaoid}')
+        cur.execute(sql, (leilao_leilaoid,))
 
         rows = cur.fetchall()
 
@@ -663,22 +688,13 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             currentDescription = row[2]
 
         # COLOCAR LEILAO ORIGINAL NA TABELA DE VERSAO
-        sql = "INSERT INTO versao (titulo, descricao, leilao_leilaoid)" \
+        sqlVersao = "INSERT INTO versao (titulo, descricao, leilao_leilaoid)" \
               "VALUES (%s,  %s,  %s)"
         try:
-            values = (currentTitle, currentDescription, leilaoID)
+            valuesVersao = (currentTitle, currentDescription, leilaoID)
         except (Exception) as error:
             codigoErro = '003'  # Payload incorreto (nome das variaveis)
             return jsonify(erro=codigoErro)
-
-        try:
-            cur.execute(sql, values)
-            cur.execute("commit")
-        except (Exception, psycopg2.DatabaseError) as error:
-            logger.error(error)
-            sucess = False
-            codigoErro = '999'  # Erro nao identificado
-            cur.execute("rollback")
 
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
@@ -701,6 +717,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         values = (newTitle, newDescription, leilao_leilaoid)
         try:
             cur.execute(sql, values)
+            cur.execute(sqlVersao, valuesVersao)
             cur.execute("commit")
             sucess = True
         except (Exception, psycopg2.DatabaseError) as error:
