@@ -320,8 +320,22 @@ def get_auction(keyword):
 
     logger.debug(f'keyword: {keyword}')
 
+    headers = request.headers
+
     conn = db_connection()
     cur = conn.cursor()
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '002'  # Payload/Header incorreto (nome/tamanho das variáveis)
+		conn.close()
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+		conn.close()
+        return jsonify(erro=userId[1])
 
     cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and artigoid = %s", (keyword,) )
     rows = cur.fetchall()
@@ -383,7 +397,7 @@ def criaLeilao():
         return jsonify(erro=vendedorID[1])
     vendedorID = vendedorID[0]
 
-    logger.info("---- New Action  ----")
+    logger.info("---- New Auction  ----")
     logger.debug(f'payload: {payload}')
 
     # VERIFICACOES
@@ -391,7 +405,7 @@ def criaLeilao():
     try:
         values = (
             payload["leilaoPrecoMinimo"], payload["leilaoTitulo"], payload["leilaoDescricao"], payload["leilaoDataFim"],
-            payload["artigoId"], payload["nomeArtigo"], vendedorID)
+            payload["artigoId"], payload["nomeArtigo"], vendedorID, payload["artigoId"])
     except Exception as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
@@ -405,7 +419,7 @@ def criaLeilao():
         return jsonify(erro=codigoErro)
 
     if not ((64 >= len(values[1]) > 0) and (512 >= len(values[2]) > 0) and (len(values[4]) == 10) and (
-            64 >= len(values[5]) > 0)):
+            64 >= len(values[5]) > 0) and (datetime.datetime.now() + datetime.timedelta(hours=1) < d)):
         if (checkIdUtilizador(values[6]) != True):
             codigoErro = '009'  # ID Vendedor inexistente
         else:
@@ -417,8 +431,13 @@ def criaLeilao():
 
     # parameterized queries, good for security and performance
     statement = """
-                      INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, vendedor_utilizador_userid) 
-                              VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s) RETURNING leilaoid """
+                      INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, vendedor_utilizador_userid)
+                              SELECT %s, %s, %s, %s, %s, %s, %s
+                              WHERE NOT EXISTS (
+                              SELECT artigoid
+                              FROM leilao
+                              WHERE artigoid = %s AND datafim >= (NOW() + INTERVAL '1 hours') ) RETURNING leilaoid;
+                              """
 
     try:
         cur.execute(statement, values)
@@ -428,7 +447,7 @@ def criaLeilao():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
-        codigoErro = '999'  # Erro nao identificado
+        codigoErro = '024'  # Criar leilão com um artigo presente noutro leilão ativo
         cur.execute("rollback")
     finally:
         if conn is not None:
@@ -437,7 +456,7 @@ def criaLeilao():
     if sucess:
         return jsonify(leilaoId=leilaoID)
     else:
-        return jsonify(leilaoId=codigoErro)
+        return jsonify(erro=codigoErro)
 
 
 @app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['GET'], strict_slashes=True)
