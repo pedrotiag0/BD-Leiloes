@@ -492,7 +492,7 @@ def getDetailsAuction(leilao_leilaoid):
           "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
     try:
-        cur.execute(sql, f'{leilao_leilaoid}')
+        cur.execute(sql, (leilao_leilaoid,))
         rows = cur.fetchall()
 
         logger.debug("---- Auction Details  ----")
@@ -515,12 +515,12 @@ def getDetailsAuction(leilao_leilaoid):
 
 
         try:
-            cur.execute(sql, f'{leilao_leilaoid}')
+            cur.execute(sql, (leilao_leilaoid,))
             rows = cur.fetchall()
 
             if len(rows) == 0:
                 codigoErro = 'Nao ha mensagens'
-                
+
 
             logger.debug("---- Mural Details  ----")
             payload.append({"DETALHES DO MURAL LEILAO": leilao_leilaoid})
@@ -531,7 +531,7 @@ def getDetailsAuction(leilao_leilaoid):
 
             sql = "SELECT id, valor, valida, username " \
                   "FROM licitacao, utilizador WHERE leilao_leilaoid = %s AND comprador_utilizador_userid = userid "
-            cur.execute(sql, f'{leilao_leilaoid}')
+            cur.execute(sql, (leilao_leilaoid,))
             rows = cur.fetchall()
 
             if len(rows) == 0: #Nao ha licitacoes
@@ -564,7 +564,6 @@ def getDetailsAuction(leilao_leilaoid):
             return jsonify(payload)
         else:
             return jsonify(erro=codigoErro)
-
 
 @app.route("/dbproj/licitar/<leilaoId>/<licitacao>", methods=['GET'])
 def make_bidding(leilaoId, licitacao):
@@ -612,8 +611,8 @@ def make_bidding(leilaoId, licitacao):
 
     try:
         sql = "INSERT INTO licitacao (valor, momento, comprador_utilizador_userid, leilao_leilaoid)" \
-              "VALUES (%s,  %s,  %s,  %s)"
-        values = (licitacao, datetime.datetime.now(), compradorId, leilaoId)
+              "VALUES (%s,  (NOW() + INTERVAL '1 hours'),  %s,  %s)"
+        values = (licitacao, compradorId, leilaoId)
         cur.execute(sql, values)
 
         cur.execute("commit")
