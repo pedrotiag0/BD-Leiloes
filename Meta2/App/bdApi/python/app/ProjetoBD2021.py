@@ -756,10 +756,8 @@ def banUser():
         return jsonify(erro=adminID[1])
     adminID = adminID[0]
 
-    userID = getUserIdByAuthCode(payload['userID'])
-    if (userID[0] == None):
-        return jsonify(erro=userID[1])
-    userId = userID[0]
+
+    userID = payload['userID']
 
 
     conn = db_connection()
@@ -790,9 +788,16 @@ def banUser():
 
     try:
         cur.execute(sql, (adminID, userID,))
+        affected_rows = cur.rowcount
         cur.execute("commit")
         #sucess = True
         #logger.debug("---- Auction Details  ----")
+
+        logger.debug(f'ROWS AFFECTED1: {affected_rows}')
+        if affected_rows == 0:  # Significa que o user nao e valido
+            codigoErro = '010'
+            return jsonify(erro=codigoErro)
+
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'
@@ -806,8 +811,7 @@ def banUser():
           "WHERE vendedor_utilizador_userid = %s AND datafim > (NOW() + INTERVAL '1 hours')"
 
     try:
-        values = userID
-        cur.execute(sql, values)
+        cur.execute(sql, (userID,))
         rows = cur.fetchall()
         logger.debug(f'USER ID: {userID}')
 
@@ -819,9 +823,9 @@ def banUser():
                   "SET admincancelou = %s " \
                   "WHERE vendedor_utilizador_userid = %s"
 
-            values = (adminID, userID)
+
             try:
-                cur.execute(sql, values)
+                cur.execute(sql, (adminID, userID,))
                 cur.execute("commit")
             except (Exception, psycopg2.DatabaseError) as error:
                 logger.error(error)
@@ -840,9 +844,8 @@ def banUser():
           "SET valida = false " \
           "WHERE comprador_utilizador_userid = %s"
 
-    values = userID
     try:
-        cur.execute(sql, values)
+        cur.execute(sql, (userID, ))
         affected_rows = cur.rowcount
         cur.execute("commit")
         logger.debug(f'ROWS AFFECTED: {affected_rows}')
@@ -859,8 +862,7 @@ def banUser():
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
         sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
-        values = userID
-        cur.execute(sql, values)
+        cur.execute(sql, (userID, ))
         rows = cur.fetchall()
 
         for row in rows: #Vou percorrer cada leilao que ele pertence para modificar as licitacoes
@@ -920,7 +922,7 @@ def banUser():
                         "VALUES (%s, NOW() + INTERVAL '1 hours', %s , %s)"
 
             try:
-                comentario = f"Lamentamos o incomodo mas o utilizador {userId} foi banido do leilao {leilaoID}"
+                comentario = f"Lamentamos o incomodo mas o utilizador {userID} foi banido do leilao {leilaoID}"
                 values = (comentario, userID, leilaoID)
             except (Exception, ValueError) as error:
                 codigoErro = '003'
@@ -937,10 +939,11 @@ def banUser():
                 codigoErro = '999'  # Erro nao identificado
                 cur.execute("rollback")
                 #return?
+                return jsonify(erro=codigoErro)
 
-            comentario = f"Utilizador {userId} foi banido do leilao {leilaoID}"
+            comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
             sqlQuery = "INSERT INTO notificacao (comentario, momento, leilao_leilaoid, utilizador_userid) "\
-                        "SELECT %s, NOW(), %s ,comprador_utilizador_userid " \
+                        "SELECT DISTINCT %s, NOW(), %s ,comprador_utilizador_userid " \
                        "FROM licitacao WHERE leilao_leilaoid = %s"
 
             values = (comentario, leilaoID, leilaoID)
@@ -953,6 +956,7 @@ def banUser():
                 codigoErro = '999'  # Erro nao identificado
                 cur.execute("rollback")
                 #return?
+                return jsonify(erro=codigoErro)
 
             # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
 
