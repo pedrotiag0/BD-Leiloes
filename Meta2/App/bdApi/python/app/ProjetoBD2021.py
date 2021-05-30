@@ -350,12 +350,17 @@ def get_auction(keyword):
         conn.close()
         return jsonify(payload)
 
+
+    keyword = keyword.lower()
     query = '%' + keyword + '%'
     cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and LOWER(descricao) LIKE %s",
                 (query,))
     rows = cur.fetchall()
+    logger.debug(f'aqui')
+
 
     if len(rows) == 0:
+
         conn.close()
         return jsonify(payload)
 
