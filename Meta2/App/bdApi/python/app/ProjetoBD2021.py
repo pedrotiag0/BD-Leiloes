@@ -240,7 +240,7 @@ def loginUser():
     password = values[1]
 
     if len(username) < 1 or len(username) > 32 or len(password) < 1 or len(password) > 32:
-        codigoErro = '002'  # # Input Invalido
+        codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
 
     conn = db_connection()
@@ -588,21 +588,24 @@ def make_bidding(leilaoId, licitacao):
 
     cur.execute("SELECT precominimo, maiorlicitacao, vendedor_utilizador_userid"
                 " FROM leilao WHERE admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours') "
-                "and leilaoid = %s", (leilaoId,) )
+                "and leilaoid = %s FOR UPDATE", (leilaoId,) )
     rows = cur.fetchall()
 
     if len(rows) == 0:
+        cur.execute("rollback")
         conn.close()
         codigoErro = '007'
         return jsonify(erro=codigoErro)
 
     row = rows[0]
     if row[2] == compradorId:
+        cur.execute("rollback")
         conn.close()
         codigoErro = '015'
         return jsonify(erro=codigoErro)
 
     if licitacao < row[0] or licitacao <= row[1]:
+        cur.execute("rollback")
         conn.close()
         codigoErro = '012'
         return jsonify(erro=codigoErro)
@@ -668,7 +671,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         jsonify(erro='021')
 
     sql = "SELECT leilaoid, titulo, descricao " \
-          "FROM leilao WHERE leilaoid = %s "
+          "FROM leilao WHERE leilaoid = %s FOR UPDATE"
 
     try:
         cur.execute(sql, (leilao_leilaoid,))
@@ -677,6 +680,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if len(rows) == 0:
             codigoErro = '002'  # Input invalido
+            cur.execute("rollback")
             conn.close()
             return jsonify(erro=codigoErro)
 
@@ -687,8 +691,21 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             currentTitle = row[1]
             currentDescription = row[2]
 
+        # COLOCAR LEILAO ORIGINAL NA TABELA DE VERSAO
+        sqlVersao = "INSERT INTO versao (titulo, descricao, leilao_leilaoid)" \
+              "VALUES (%s,  %s,  %s)"
+        try:
+            valuesVersao = (currentTitle, currentDescription, leilaoID)
+        except (Exception) as error:
+            codigoErro = '003'  # Payload incorreto (nome das variaveis)
+            cur.execute("rollback")
+            conn.close()
+            return jsonify(erro=codigoErro)
+
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
         if len(newTitle) == 0:
@@ -699,6 +716,8 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if len(newTitle) == 0 and len(newDescription) == 0 or currentTitle == newTitle and currentDescription == newDescription:
             codigoErro = '002'  # As alteracoes estao vazias/iguais e nao se altera nada
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
         sql = "UPDATE leilao " \
@@ -708,7 +727,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         values = (newTitle, newDescription, leilao_leilaoid)
         try:
             cur.execute(sql, values)
-            # LEILAO ORIGINAL COLOCADO NA TABELA DE VERSAO ATRAVES DE UM TRIGGER
+            cur.execute(sqlVersao, valuesVersao)
             cur.execute("commit")
             sucess = True
         except (Exception, psycopg2.DatabaseError) as error:
@@ -722,6 +741,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -730,6 +750,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             return jsonify(payload)
         else:
             return jsonify(erro=codigoErro)
+
 
 @app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
 def banUser():
@@ -763,7 +784,7 @@ def banUser():
 
     # Colocar ID Admin na tabela utilizador na linha do user a banir
     sql = "UPDATE utilizador " \
-          "SET adminbaniu = %s , authtoken = null " \
+          "SET adminbaniu = %s " \
           "WHERE userid = %s"
 
     try:
@@ -777,7 +798,7 @@ def banUser():
         return jsonify(erro=codigoErro)
 
     try:
-        cur.execute(sql, (adminID, userID, ))
+        cur.execute(sql, (adminID, userID,))
         affected_rows = cur.rowcount
         cur.execute("commit")
         #sucess = True
@@ -786,6 +807,8 @@ def banUser():
         logger.debug(f'ROWS AFFECTED1: {affected_rows}')
         if affected_rows == 0:  # Significa que o user nao e valido
             codigoErro = '010'
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -798,7 +821,7 @@ def banUser():
     # Verificar se o user tem algum leilao a decorrer
     sql = "SELECT * " \
           "FROM leilao " \
-          "WHERE vendedor_utilizador_userid = %s AND datafim > (NOW() + INTERVAL '1 hours')"
+          "WHERE vendedor_utilizador_userid = %s AND datafim > (NOW() + INTERVAL '1 hours') FOR UPDATE"
 
     try:
         cur.execute(sql, (userID,))
@@ -826,7 +849,8 @@ def banUser():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'
-
+        cur.execute("rollback")
+        conn.close()
         return jsonify(erro=codigoErro)
 
     # Verificar se o user a banir tem alguma licitacao e invalida-la
@@ -837,7 +861,6 @@ def banUser():
     try:
         cur.execute(sql, (userID, ))
         affected_rows = cur.rowcount
-        cur.execute("commit")
         logger.debug(f'ROWS AFFECTED: {affected_rows}')
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
@@ -848,10 +871,11 @@ def banUser():
 
     if affected_rows == 0: #Significa que o user nao tinha licitacoes
         codigoErro = '019'
-        #return jsonify(erro=codigoErro)
+        conn.close()
+        return jsonify(erro=codigoErro)
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
-        sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
+        sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s FOR UPDATE"
         cur.execute(sql, (userID, ))
         rows = cur.fetchall()
 
@@ -859,19 +883,18 @@ def banUser():
             leilaoID = row[0]
             logger.debug(f'LEILAO ID: {leilaoID}, TYPE: {type(leilaoID)}')
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s "
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s"
             sqlValues = (userID, leilaoID)
             cur.execute(sqlQuery, sqlValues)
             maxValueUser = cur.fetchall()[0]
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s "
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s"
             cur.execute(sqlQuery, [leilaoID])
             maxBidAuction = cur.fetchall()[0]
 
             if  maxValueUser < maxBidAuction: #invalidar todas as licitacoes entre estes 2 valores e colocar a maior licitacao com o valor do user a banir
                 sqlQuery = "UPDATE licitacao SET valida = "\
                                         "CASE " \
-                                            "WHEN valida = false THEN false "\
                                             "WHEN valor = %s THEN true " \
                                             "WHEN valor >= %s AND valor < %s THEN false " \
                                             "ELSE true "\
@@ -886,7 +909,6 @@ def banUser():
                 values = (maxBidAuction, maxValueUser, maxBidAuction, maxBidAuction, maxValueUser, leilaoID)
                 try:
                     cur.execute(sqlQuery, values)
-                    cur.execute("commit")
                 except (Exception, psycopg2.DatabaseError) as error:
                     logger.error(error)
                     codigoErro = '999'
@@ -923,13 +945,13 @@ def banUser():
 
             try:
                 cur.execute(sqlQuery, values)
-                cur.execute("commit")
+                #cur.execute("commit")
             except (Exception, psycopg2.DatabaseError) as error:
                 logger.error(error)
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
                 cur.execute("rollback")
-                #return?
+                conn.close()
                 return jsonify(erro=codigoErro)
 
             comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
@@ -940,13 +962,13 @@ def banUser():
             values = (comentario, leilaoID, leilaoID)
             try:
                 cur.execute(sqlQuery, values)
-                cur.execute("commit")
+                #cur.execute("commit")
             except (Exception, psycopg2.DatabaseError) as error:
                 logger.error(error)
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
                 cur.execute("rollback")
-                #return?
+                conn.close()
                 return jsonify(erro=codigoErro)
 
             # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
@@ -991,17 +1013,17 @@ def cancel_auction(leilaoId):
     cur = conn.cursor()
 
     cur.execute("SELECT leilaoid FROM leilao "
-                "WHERE admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours') AND leilaoid = %s"
+                "WHERE admincancelou IS NULL AND datafim > (NOW() + INTERVAL '1 hours') AND leilaoid = %s FOR UPDATE"
                 , (leilaoId,))
     rows = cur.fetchall()
     if len(rows) == 0:
+        cur.execute("rollback")
         conn.close()
         codigoErro = '007'
         return jsonify(erro=codigoErro)
 
     try:
         cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
-		# TRIGGER ENVIA NOTIFICACOES
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         cur.execute("rollback")
