@@ -28,15 +28,7 @@ def hello():
     """
 
 
-##
 ##      Registo de Utilizadores
-##
-## -Criar um novo utilizador, inserindo os dados requeridos pelo modelo de dados.
-##
-## [Argumentos a inserir...]
-##
-##
-
 @app.route("/dbproj/user", methods=['POST'])
 def addUser():
     logger.info("###              BD [Insert User]: POST /dbproj/user              ###");
@@ -248,7 +240,7 @@ def loginUser():
     password = values[1]
 
     if len(username) < 1 or len(username) > 32 or len(password) < 1 or len(password) > 32:
-        codigoErro = '002'  # Payload incorreto
+        codigoErro = '002'  # # Input Invalido
         return jsonify(erro=codigoErro)
 
     conn = db_connection()
