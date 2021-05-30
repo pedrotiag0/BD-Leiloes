@@ -320,8 +320,20 @@ def get_auction(keyword):
 
     logger.debug(f'keyword: {keyword}')
 
+    headers = request.headers
+
     conn = db_connection()
     cur = conn.cursor()
+
+    try:
+        authCode = headers['authToken']
+    except (Exception) as error:
+        codigoErro = '002'  # Payload/Header incorreto (nome/tamanho das variáveis)
+        return jsonify(erro=codigoErro)
+
+    userId = getUserIdByAuthCode(authCode)
+    if (userId[0] == None):
+        return jsonify(erro=userId[1])
 
     cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours') and artigoid = %s", (keyword,) )
     rows = cur.fetchall()
