@@ -687,15 +687,6 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             currentTitle = row[1]
             currentDescription = row[2]
 
-        # COLOCAR LEILAO ORIGINAL NA TABELA DE VERSAO
-        sqlVersao = "INSERT INTO versao (titulo, descricao, leilao_leilaoid)" \
-              "VALUES (%s,  %s,  %s)"
-        try:
-            valuesVersao = (currentTitle, currentDescription, leilaoID)
-        except (Exception) as error:
-            codigoErro = '003'  # Payload incorreto (nome das variaveis)
-            return jsonify(erro=codigoErro)
-
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
             return jsonify(erro=codigoErro)
@@ -717,7 +708,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         values = (newTitle, newDescription, leilao_leilaoid)
         try:
             cur.execute(sql, values)
-            cur.execute(sqlVersao, valuesVersao)
+            # LEILAO ORIGINAL COLOCADO NA TABELA DE VERSAO ATRAVES DE UM TRIGGER
             cur.execute("commit")
             sucess = True
         except (Exception, psycopg2.DatabaseError) as error:
@@ -739,7 +730,6 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             return jsonify(payload)
         else:
             return jsonify(erro=codigoErro)
-
 
 @app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
 def banUser():
