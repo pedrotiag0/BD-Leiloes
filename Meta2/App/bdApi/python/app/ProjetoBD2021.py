@@ -1001,6 +1001,7 @@ def cancel_auction(leilaoId):
 
     try:
         cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
+		# TRIGGER ENVIA NOTIFICACOES
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         cur.execute("rollback")
