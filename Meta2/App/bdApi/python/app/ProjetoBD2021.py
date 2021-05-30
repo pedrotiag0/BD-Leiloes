@@ -606,8 +606,8 @@ def make_bidding(leilaoId, licitacao):
 
     try:
         sql = "INSERT INTO licitacao (valor, momento, comprador_utilizador_userid, leilao_leilaoid)" \
-              "VALUES (%s,  %s,  %s,  %s)"
-        values = (licitacao, datetime.datetime.now(), compradorId, leilaoId)
+              "VALUES (%s,  (NOW() + INTERVAL '1 hours'),  %s,  %s)"
+        values = (licitacao, compradorId, leilaoId)
         cur.execute(sql, values)
 
         cur.execute("commit")
