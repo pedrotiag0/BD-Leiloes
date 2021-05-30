@@ -456,7 +456,15 @@ def getDetailsAuction(leilao_leilaoid):
     conn = db_connection()
     cur = conn.cursor()
 
-    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
+    headers = request.headers
+    authCode = headers["authToken"]
+
+    userID = getUserIdByAuthCode(authCode)
+    if (userID[0] == None):
+        return jsonify(erro=userID[1])
+    userID = userID[0]
+
+    sql = "SELECT DISTINCT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
           "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
     try:
