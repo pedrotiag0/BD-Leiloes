@@ -73,10 +73,12 @@ def addUser():
     except psycopg2.IntegrityError:
         sucess = False
         codigoErro = '001'  # Utilizador duplicado
+        cur.execute("rollback")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -120,10 +122,12 @@ def addVendedor():
     except psycopg2.IntegrityError:
         sucess = False
         codigoErro = '016'  # Vendedor Duplicado
+        cur.execute("rollback")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -131,6 +135,7 @@ def addVendedor():
         return jsonify(vendedorId=novoVendedorId)
     else:
         return jsonify(erro=codigoErro)
+
 
 @app.route("/dbproj/comprador", methods=['POST'])
 def addComprador():
@@ -166,10 +171,12 @@ def addComprador():
     except psycopg2.IntegrityError:
         sucess = False
         codigoErro = '017'  # Comprador Duplicado
+        cur.execute("rollback")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -177,6 +184,7 @@ def addComprador():
         return jsonify(compradorId=novoCompradorId)
     else:
         return jsonify(erro=codigoErro)
+
 
 @app.route("/dbproj/admin", methods=['POST'])
 def addAdmin():
@@ -206,10 +214,12 @@ def addAdmin():
     except psycopg2.IntegrityError:
         sucess = False
         codigoErro = '018'  # Administrador Duplicado
+        cur.execute("rollback")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -224,9 +234,6 @@ def loginUser():
     logger.info("###              BD [Login User]: PUT /dbproj/user              ###");
     payload = request.get_json()
 
-    conn = db_connection()
-    cur = conn.cursor()
-
     logger.info("---- login  ----")
     logger.debug(f'payload: {payload}')
 
@@ -237,22 +244,28 @@ def loginUser():
         codigoErro = '003'  # Payload incorreto
         return jsonify(erro=codigoErro)
 
-    username = payload["username"]
-    password = payload["password"]
+    username = values[0]
+    password = values[1]
+
     if len(username) < 1 or len(username) > 32 or len(password) < 1 or len(password) > 32:
         codigoErro = '002'  # Payload incorreto
         return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
 
     cur.execute("SELECT userid, password FROM utilizador WHERE username = %s", (username,))
     rows = cur.fetchall()
 
     if len(rows) == 0:
         codigoErro = '004'  # Credenciais incorretas
+        conn.close()
         return jsonify(erro=codigoErro)
 
     hashed = rows[0][1]
     if not pwd_context.verify(password, hashed):
         codigoErro = '004'  # Credenciais incorretas
+        conn.close()
         return jsonify(erro=codigoErro)
 
     userid = rows[0][0]
@@ -273,6 +286,7 @@ def loginUser():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'
+        cur.execute("rollback")
         return jsonify(erro=codigoErro)
     finally:
         if conn is not None:
@@ -292,6 +306,7 @@ def get_all_auctions():
         cur.execute("SELECT leilaoid, descricao FROM leilao WHERE datafim > (NOW() + INTERVAL '1 hours')")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -357,7 +372,10 @@ def checkIdUtilizador(idVendedor):
 
     if len(rows) == 0:
         codigoErro = '004'  # Credenciais incorretas
+        conn.close()
         return False
+
+    conn.close()
     return True
 
 
@@ -373,16 +391,8 @@ def criaLeilao():
         return jsonify(erro=vendedorID[1])
     vendedorID = vendedorID[0]
 
-    conn = db_connection()
-    cur = conn.cursor()
-
     logger.info("---- New Action  ----")
     logger.debug(f'payload: {payload}')
-
-    # parameterized queries, good for security and performance
-    statement = """
-                  INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, vendedor_utilizador_userid) 
-                          VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s) RETURNING leilaoid """
 
     # VERIFICACOES
 
@@ -410,6 +420,14 @@ def criaLeilao():
             codigoErro = '002'  # Input Invalido
         return jsonify(erro=codigoErro)
 
+    conn = db_connection()
+    cur = conn.cursor()
+
+    # parameterized queries, good for security and performance
+    statement = """
+                      INSERT INTO leilao (precominimo, titulo, descricao, datafim, artigoid, nomeartigo, vendedor_utilizador_userid) 
+                              VALUES ( %s,   %s ,   %s ,  %s , %s , %s , %s) RETURNING leilaoid """
+
     try:
         cur.execute(statement, values)
         sucess = True
@@ -419,6 +437,7 @@ def criaLeilao():
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -436,18 +455,17 @@ def getDetailsAuction(leilao_leilaoid):
     sucess = False
     logger.info("###              BD [Get Auction]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
 
-    conn = db_connection()
-    cur = conn.cursor()
-
-
-    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
-          "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
-
     try:
         leilaoID = int(leilao_leilaoid)
     except (Exception, ValueError) as error:
         codigoErro = '003'
         return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    sql = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao, username " \
+          "FROM leilao, utilizador, vendedor WHERE leilaoid = %s AND vendedor_utilizador_userid = userid "
 
     try:
         cur.execute(sql, f'{leilao_leilaoid}')
@@ -457,6 +475,7 @@ def getDetailsAuction(leilao_leilaoid):
 
         if len(rows) == 0:
             codigoErro = '007'
+            conn.close()
             return jsonify(erro=codigoErro)
 
         payload.append({"DETALHES DO LEILAO": leilao_leilaoid})
@@ -506,6 +525,7 @@ def getDetailsAuction(leilao_leilaoid):
         except (Exception, psycopg2.DatabaseError) as error:
             logger.error(error)
             codigoErro = '999'
+            conn.close()
             return jsonify(erro=codigoErro)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -521,7 +541,7 @@ def getDetailsAuction(leilao_leilaoid):
         else:
             return jsonify(erro=codigoErro)
 
-			
+
 @app.route("/dbproj/licitar/<leilaoId>/<licitacao>", methods=['GET'])
 def make_bidding(leilaoId, licitacao):
     logger.info("###              BD [Make bidding]: GET /dbproj/licitar/<leilaoId>/<licitacao>             ###");
@@ -576,7 +596,8 @@ def make_bidding(leilaoId, licitacao):
     except (Exception, psycopg2.DatabaseError) as error:
         conn.close()
         codigoErro = '999'
-        return str(error)
+        cur.execute("rollback")
+        return jsonify(erro=codigoErro)
 
     conn.close()
     return jsonify("Sucesso")
@@ -585,23 +606,23 @@ def make_bidding(leilaoId, licitacao):
 @app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['PUT'])
 def alteraPropriedadeLeilao(leilao_leilaoid):
     codigoErro = ''
-    payload = []
     sucess = False
     logger.info(
         "###              BD [Change Auction Properties]: Get /dbproj/leilao/<leilao_leilaoid>              ###");
 
     payload = request.get_json()
-    conn = db_connection()
-    cur = conn.cursor()
-
-    sql = "SELECT leilaoid, titulo, descricao " \
-          "FROM leilao WHERE leilaoid = %s "
 
     try:
         leilaoID = int(leilao_leilaoid)
     except (Exception, ValueError) as error:
         codigoErro = '003'  # NAO E NUMERO
         return jsonify(erro=codigoErro)
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    sql = "SELECT leilaoid, titulo, descricao " \
+          "FROM leilao WHERE leilaoid = %s "
 
     try:
         cur.execute(sql, f'{leilao_leilaoid}')
@@ -610,6 +631,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 
         if len(rows) == 0:
             codigoErro = '002'  # Input invalido
+            conn.close()
             return jsonify(erro=codigoErro)
 
         newTitle = payload['novoTitulo']
@@ -635,6 +657,7 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             logger.error(error)
             sucess = False
             codigoErro = '999'  # Erro nao identificado
+            cur.execute("rollback")
 
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
@@ -662,6 +685,8 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         except (Exception, psycopg2.DatabaseError) as error:
             logger.error(error)
             codigoErro = '999'
+            cur.execute("rollback")
+            conn.close()
             return jsonify(erro=codigoErro)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -681,7 +706,6 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
 @app.route("/dbproj/leilao/ban/", methods=['PUT'], strict_slashes=True)
 def banUser():
     codigoErro = ''
-    payload = []
     sucess = False
     logger.info("###              BD [Ban User Auction]: Put /dbproj/leilao/ban/<userid>             ###");
 
@@ -734,6 +758,8 @@ def banUser():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'
+        cur.execute("rollback")
+        conn.close()
         return jsonify(erro=codigoErro)
 
     # Verificar se o user tem algum leilao a decorrer
@@ -762,6 +788,8 @@ def banUser():
             except (Exception, psycopg2.DatabaseError) as error:
                 logger.error(error)
                 codigoErro = '999'
+                cur.execute("rollback")
+                conn.close()
                 return jsonify(erro=codigoErro)
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
@@ -775,7 +803,6 @@ def banUser():
           "WHERE comprador_utilizador_userid = %s"
 
     values = userID
-    affected_rows = 0
     try:
         cur.execute(sql, values)
         affected_rows = cur.rowcount
@@ -784,7 +811,8 @@ def banUser():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999' # comprador invalido ou nao tem licitacoes
-
+        cur.execute("rollback")
+        conn.close()
         return jsonify(erro=codigoErro)
 
     if affected_rows == 0: #Significa que o user nao tinha licitacoes
@@ -794,7 +822,7 @@ def banUser():
         # E preciso obter o valor da licitacao max do user de todos os leiloes
         sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
         values = userID
-        cur.execute(sql ,values)
+        cur.execute(sql, values)
         rows = cur.fetchall()
 
         for row in rows: #Vou percorrer cada leilao que ele pertence para modificar as licitacoes
@@ -831,6 +859,8 @@ def banUser():
                 except (Exception, psycopg2.DatabaseError) as error:
                     logger.error(error)
                     codigoErro = '999'
+                    cur.execute("rollback")
+                    conn.close()
                     return jsonify(erro=codigoErro)
 
                 # DEPOIS DE ALTERAR OS VALORES DA LICITACAO TENHO DE ALTERAR O VALOR DA MAIOR LICITACAO DO LEILAO
@@ -842,6 +872,8 @@ def banUser():
                 except (Exception, psycopg2.DatabaseError) as error:
                     logger.error(error)
                     codigoErro = '999'
+                    cur.execute("rollback")
+                    conn.close()
                     return jsonify(erro=codigoErro)
 
 
@@ -854,6 +886,8 @@ def banUser():
                 values = (comentario, userID, leilaoID)
             except (Exception, ValueError) as error:
                 codigoErro = '003'
+                cur.execute("rollback")
+                conn.close()
                 return jsonify(erro=codigoErro)
 
             try:
@@ -863,6 +897,8 @@ def banUser():
                 logger.error(error)
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
+                cur.execute("rollback")
+                #return?
 
             comentario = f"Utilizador {userId} foi banido do leilao {leilaoID}"
             sqlQuery = "INSERT INTO notificacao (comentario, momento, leilao_leilaoid, utilizador_userid) "\
@@ -877,6 +913,8 @@ def banUser():
                 logger.error(error)
                 sucess = False
                 codigoErro = '999'  # Erro nao identificado
+                cur.execute("rollback")
+                #return?
 
             # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
 
@@ -928,7 +966,14 @@ def cancel_auction(leilaoId):
         codigoErro = '007'
         return jsonify(erro=codigoErro)
 
-    cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
+    try:
+        cur.execute("UPDATE leilao SET admincancelou = %s WHERE leilaoid = %s", (adminId, leilaoId))
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(error)
+        cur.execute("rollback")
+        conn.close()
+        codigoErro = '999'
+        return jsonify(erro=codigoErro)
 
     cur.execute("commit")
     conn.close()
@@ -940,8 +985,6 @@ def listAuctionsByUser():
     logger.info("###              BD [Get Auction By User]: Get /dbproj/leiloesAtividade              ###");
 
     headers = request.headers
-    conn = db_connection()
-    cur = conn.cursor()
 
     try:
         authCode = headers['authToken']
@@ -954,6 +997,9 @@ def listAuctionsByUser():
         return jsonify(erro=userId[1])
     userId = userId[0]
     #return jsonify(Encontrei=userId) #DEBUG
+
+    conn = db_connection()
+    cur = conn.cursor()
 
     statement = "SELECT leilaoid, titulo, descricao, datafim, artigoid, nomeartigo, maiorlicitacao" \
                 " FROM leilao AS l" \
@@ -968,6 +1014,7 @@ def listAuctionsByUser():
                        'artigoid': row[4], 'nomeartigo': row[5], 'maiorlicitcao': row[6]}
         payload.append(content)  # appending to the payload to be returned
 
+    conn.close()
     return jsonify(payload)
 
 
@@ -1016,10 +1063,12 @@ def sendMsgAuction(leilao_leilaoid):
     except psycopg2.IntegrityError:
         sucess = False
         codigoErro = '007'  # Leilao Inexistente
+        cur.execute("rollback")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
         codigoErro = '999'  # Erro nao identificado
+        cur.execute("rollback")
     finally:
         if conn is not None:
             conn.close()
@@ -1034,8 +1083,6 @@ def get_inbox():
     logger.info("###              BD [Get Inbox By User]: Get /dbproj/caixaEntrada              ###");
 
     headers = request.headers
-    conn = db_connection()
-    cur = conn.cursor()
 
     try:
         authCode = headers['authToken']
@@ -1047,7 +1094,9 @@ def get_inbox():
     if(userId[0] == None):
         return jsonify(erro=userId[1])
     userId = userId[0]
-    #return jsonify(Encontrei=userId) #DEBUG
+
+    conn = db_connection()
+    cur = conn.cursor()
 
     cur.execute("SELECT leilao_leilaoid, comentario, momento FROM notificacao WHERE utilizador_userid = %s", (userId,))
     rows = cur.fetchall()
@@ -1056,8 +1105,7 @@ def get_inbox():
         #"LeilaoId": 7, "Aviso": “Licitação ultrapassada.”, "Momento": "2021-05-27 19:13:49"
         content = {'LeilaoId': row[0], 'Aviso': row[1], 'Momento': row[2]}
         payload.append(content)  # appending to the payload to be returned
-        
-    
+
     cur.execute("SELECT username, leilao_leilaoid, comentario, momento FROM mensagem, utilizador "
                 "WHERE utilizador_userid = userid AND utilizador_userid != %s "
                 "AND leilao_leilaoid IN (SELECT leilao_leilaoid FROM mensagem WHERE utilizador_userid = %s) "
@@ -1069,12 +1117,11 @@ def get_inbox():
         content = {'Username': row[0], 'LeilaoId': row[1], 'Comentario': row[2], 'Momento': row[3]}
         payload.append(content)  # appending to the payload to be returned
 
-
+    conn.close()
     return jsonify(payload)
 
 
 def checkLeilaoAtivo(idLeilao):
-    leilao = None
     conn = db_connection()
     cur = conn.cursor()
 
@@ -1088,11 +1135,13 @@ def checkLeilaoAtivo(idLeilao):
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
+        conn.close()
         return (None, codigoErro)
     finally:
         if conn is not None:
             conn.close()
     return leilao
+
 
 @app.route("/dbproj/adminStats", methods=['GET'])
 def getAdminStats():
@@ -1121,6 +1170,7 @@ def getAdminStats():
                     " GROUP BY userid, username ORDER BY COUNT DESC")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -1148,6 +1198,7 @@ def getAdminStats():
                     " GROUP BY userid, username ORDER BY COUNT DESC")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -1169,6 +1220,7 @@ def getAdminStats():
         cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE datafim > (NOW() - INTERVAL '-1 hour 10 days')")
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
     rows = cur.fetchall()
     logger.debug("---- Numero total de leiloes nos ultimos 10 dias  ----")
@@ -1179,6 +1231,7 @@ def getAdminStats():
         conn.close()
 
     return jsonify(resposta)
+
 
 @app.route("/dbproj/versoes/<leilaoid>", methods=['GET'])
 def getVersoesLeilao(leilaoid):
@@ -1191,6 +1244,7 @@ def getVersoesLeilao(leilaoid):
         cur.execute("SELECT versaoid, titulo, descricao FROM versao WHERE leilao_leilaoid = %s", (leilaoid,))
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -1204,6 +1258,7 @@ def getVersoesLeilao(leilaoid):
 
     conn.close()
     return jsonify(payload)
+
 
 @app.route("/dbproj/terminarLeiloes", methods=['PUT'])
 def terminarLeiloes():
@@ -1231,6 +1286,7 @@ def terminarLeiloes():
         cur.execute("SELECT COUNT(leilaoid) FROM leilao WHERE leilaoid = %s AND vendedor_utilizador_userid = %s", (idLeilao,vendedorId,))
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -1244,6 +1300,7 @@ def terminarLeiloes():
         cur.execute("SELECT precominimo, maiorlicitacao, admincancelou, titulo, nomeartigo FROM leilao WHERE leilaoid = %s AND datafim < (NOW() + INTERVAL '1 hours')", (idLeilao,))
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
     rows = cur.fetchall()
@@ -1252,10 +1309,10 @@ def terminarLeiloes():
     adminCancelou = rows[0][2]
     tituloLeilao = rows[0][3]
     nomeArtigo = rows[0][4]
-    if(len(rows)==0):
+    if len(rows) == 0:
         conn.close()
         return jsonify(erro='023')
-    elif(adminCancelou != None):                   # adminCancelou
+    elif adminCancelou != None :                   # adminCancelou
         conn.close()
         return jsonify({'leilaoId': idLeilao, 'Cancelado': rows[0][2]})
     elif(precoMinimo > maiorLicitacao):
@@ -1271,6 +1328,7 @@ def terminarLeiloes():
         cur.execute(statement, (maiorLicitacao, idLeilao,))
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        conn.close()
         return jsonify(erro='999')
 
 
@@ -1295,6 +1353,8 @@ def terminarLeiloes():
         # return jsonify((idLeilao, idVencedor, comentarioVencedor, comentarioPerdedor,)) # DEBUG
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
+        cur.execute("rollback")
+        conn.close()
         return jsonify(erro='999')
 
     if conn is not None:
@@ -1302,10 +1362,8 @@ def terminarLeiloes():
 
     return jsonify({'leilaoId': idLeilao, 'vencedor': usernameVencedor})
 
-	
-def getUserIdByAuthCode(authCode):
-    userId = None
 
+def getUserIdByAuthCode(authCode):
     conn = db_connection()
     cur = conn.cursor()
 
@@ -1314,11 +1372,13 @@ def getUserIdByAuthCode(authCode):
         rows = cur.fetchall()
         if(len(rows) != 1):
             codigoErro = '005'  # Utilizador nao registado na base de dados
+            conn.close()
             return (None, codigoErro)
         userId = rows[0]
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
+        conn.close()
         return (None, codigoErro)
     finally:
         if conn is not None:
@@ -1326,9 +1386,8 @@ def getUserIdByAuthCode(authCode):
 
     return userId
 
-def getAdminIdByAuthCode(authCode):
-    adminId = None
 
+def getAdminIdByAuthCode(authCode):
     conn = db_connection()
     cur = conn.cursor()
 
@@ -1337,11 +1396,13 @@ def getAdminIdByAuthCode(authCode):
         rows = cur.fetchall()
         if(len(rows) != 1):
             codigoErro = '011'  # Utilizador nao e um admin/não existe
+            conn.close()
             return (None, codigoErro)
         adminId = rows[0]
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
+        conn.close()
         return (None, codigoErro)
     finally:
         if conn is not None:
@@ -1351,8 +1412,6 @@ def getAdminIdByAuthCode(authCode):
 
 
 def getCompradorIdByAuthCode(authCode):
-    compradorId = None
-
     conn = db_connection()
     cur = conn.cursor()
 
@@ -1361,11 +1420,13 @@ def getCompradorIdByAuthCode(authCode):
         rows = cur.fetchall()
         if(len(rows) != 1):
             codigoErro = '014'  # Utilizador nao e um comprador/não existe
+            conn.close()
             return (None, codigoErro)
         compradorId = rows[0]
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
+        conn.close()
         return (None, codigoErro)
     finally:
         if conn is not None:
@@ -1374,8 +1435,6 @@ def getCompradorIdByAuthCode(authCode):
     return compradorId
 
 def getVendedorIdByAuthCode(authCode):
-    vendedorId = None
-
     conn = db_connection()
     cur = conn.cursor()
 
@@ -1384,11 +1443,13 @@ def getVendedorIdByAuthCode(authCode):
         rows = cur.fetchall()
         if(len(rows) != 1):
             codigoErro = '022'  # Utilizador nao e um vendedor/não existe
+            conn.close()
             return (None, codigoErro)
         vendedorId = rows[0]
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         codigoErro = '999'  # Erro nao identificado
+        conn.close()
         return (None, codigoErro)
     finally:
         if conn is not None:
@@ -1410,6 +1471,7 @@ def desencriptaPass(password):
             passwordDesencriptada += c
 
     return passwordDesencriptada
+
 
 def db_connection():
     db = psycopg2.connect(user="aulaspl",
@@ -1438,7 +1500,7 @@ if __name__ == "__main__":
     with open('dbPass.txt') as f:
         password = f.readlines()
     passwordDesencriptada = desencriptaPass(password[0])
-	
+
     time.sleep(1)  # just to let the DB start before this print :-)
 
     logger.info("\n---------------------------------------------------------------\n" +
