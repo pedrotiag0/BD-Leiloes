@@ -87,6 +87,31 @@ ALTER TABLE versao ADD CONSTRAINT versao_fk1 FOREIGN KEY (leilao_leilaoid) REFER
 ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk1 FOREIGN KEY (leilao_leilaoid) REFERENCES leilao(leilaoid);
 ALTER TABLE notificacao ADD CONSTRAINT notificacao_fk2 FOREIGN KEY (utilizador_userid) REFERENCES utilizador(userid);
 
+-- Trigger que notifica automaticamente os utilizadores cuja licitacao foi ultrapassada
+CREATE OR REPLACE FUNCTION BidNotification() RETURNS trigger
+LANGUAGE plpgsql
+as $$
+BEGIN
+	-- Envia notificacoes
+	INSERT INTO notificacao(comentario, momento, leilao_leilaoid, utilizador_userid)
+	SELECT 'Licitacao ultrapassada pelo user '||new.comprador_utilizador_userid||', com o valor de '||new.valor, NOW() + INTERVAL '1 hours', new.leilao_leilaoid, comprador_utilizador_userid
+	FROM licitacao
+	WHERE comprador_utilizador_userid != new.comprador_utilizador_userid
+		AND valor < new.valor
+		AND leilao_leilaoid = new.leilao_leilaoid AND valida = true;
+	
+	-- Atualiza leilao
+	UPDATE leilao SET maiorlicitacao = new.valor WHERE leilaoid = new.leilao_leilaoid;
+    RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tLicitacaoUltrapassada on licitacao;
+CREATE TRIGGER tLicitacaoUltrapassada
+AFTER INSERT ON licitacao
+FOR EACH ROW
+EXECUTE PROCEDURE BidNotification();
+
 -- Popular Base de Dados
 insert into utilizador (userid, username, email, password, adminbaniu, authtoken)
 values  (1, 'user1', 'user1@email2.com', '$pbkdf2-sha256$30000$Z2yNMaa0Vsr5n/Nei1EKoQ$QaWn1eEW0I4kmX81uP0zTN0PP30nxu3GYG00dyje6Yo', null, 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyaWQiOjEsImV4cCI6MTYyMjI5NTcyN30.3kfRFmZoJj1qb183rv6f0JAtVOQ6gBy8LV4c8SHBYmI'),

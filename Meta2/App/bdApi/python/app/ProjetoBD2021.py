@@ -521,66 +521,7 @@ def getDetailsAuction(leilao_leilaoid):
         else:
             return jsonify(erro=codigoErro)
 
-
-def higherBidNotification(compradorId, licitacao, leilaoId):
-    codigoErro = ''
-    sucess = False
-    payload = []
-    conn = db_connection()
-    cur = conn.cursor()
-
-    sql = "SELECT comprador_utilizador_userid " \
-          "FROM licitacao " \
-          "WHERE comprador_utilizador_userid != %s AND valor < %s" \
-          " AND leilao_leilaoid = %s AND valida = true"
-
-    try:
-        values = (compradorId, licitacao, leilaoId)
-        cur.execute(sql, values)
-        rows = cur.fetchall()
-        if len(rows) == 0:
-            codigoErro = '020'
-            return jsonify(erro=codigoErro)
-
-        for row in rows: # para cada comprador que foi superado o seu valor, escrever uma msg no seu inbox
-            idUser = row[0]
-            sqlQuery = "INSERT INTO notificacao (comentario, momento, utilizador_userid) " \
-                       "VALUES (%s, NOW() + INTERVAL '1 hours', %s)"
-
-            try:
-                comentario = f"Licitacao ultrapassadda pelo user {compradorId}, com o valor de {licitacao}"
-                values = (comentario, idUser)
-                cur.execute(sqlQuery, values)
-                cur.execute("commit")
-                sucess = True
-
-                content = {'Comprador ID': compradorId, 'Valor Licitacao': licitacao, 'Leilao ID':leilaoId}
-                payload.append(content)
-
-            except (Exception, psycopg2.DatabaseError) as error:
-                logger.error(error)
-                sucess = False
-                codigoErro = '999'  # Erro nao identificado
-
-    except (Exception, ValueError) as error:
-        codigoErro = '003'
-        return jsonify(erro=codigoErro)
-    except (Exception, psycopg2.DatabaseError) as error:
-        logger.error(error)
-        codigoErro = '999'
-        return jsonify(erro=codigoErro)
-    finally:
-        if conn is not None:
-            conn.close()
-
-        if sucess:
-            return jsonify(payload)
-        else:
-            return jsonify(erro=codigoErro)
-
-
-
-
+			
 @app.route("/dbproj/licitar/<leilaoId>/<licitacao>", methods=['GET'])
 def make_bidding(leilaoId, licitacao):
     logger.info("###              BD [Make bidding]: GET /dbproj/licitar/<leilaoId>/<licitacao>             ###");
@@ -626,20 +567,12 @@ def make_bidding(leilaoId, licitacao):
         return jsonify(erro=codigoErro)
 
     try:
-        sql = "UPDATE leilao " \
-              "SET maiorlicitacao = %s" \
-              "WHERE leilaoid = %s "
-        values = (licitacao, leilaoId)
-        cur.execute(sql, values)
-
         sql = "INSERT INTO licitacao (valor, momento, comprador_utilizador_userid, leilao_leilaoid)" \
               "VALUES (%s,  %s,  %s,  %s)"
         values = (licitacao, datetime.datetime.now(), compradorId, leilaoId)
         cur.execute(sql, values)
 
         cur.execute("commit")
-
-        higherBidNotification(compradorId, licitacao, leilaoId)
     except (Exception, psycopg2.DatabaseError) as error:
         conn.close()
         codigoErro = '999'
