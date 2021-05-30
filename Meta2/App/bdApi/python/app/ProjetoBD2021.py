@@ -433,7 +433,7 @@ def criaLeilao():
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(error)
         sucess = False
-        codigoErro = '999'  # Erro nao identificado
+        codigoErro = '024'  # Criar leilão com um artigo presente noutro leilão ativo
         cur.execute("rollback")
     finally:
         if conn is not None:
@@ -442,7 +442,7 @@ def criaLeilao():
     if sucess:
         return jsonify(leilaoId=leilaoID)
     else:
-        return jsonify(leilaoId=codigoErro)
+        return jsonify(erro=codigoErro)
 
 
 @app.route("/dbproj/leilao/<leilao_leilaoid>", methods=['GET'], strict_slashes=True)
