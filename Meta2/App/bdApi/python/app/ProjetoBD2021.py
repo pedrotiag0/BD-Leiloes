@@ -766,7 +766,7 @@ def banUser():
 
     # Colocar ID Admin na tabela utilizador na linha do user a banir
     sql = "UPDATE utilizador " \
-          "SET adminbaniu = %s " \
+          "SET adminbaniu = %s , authtoken = null " \
           "WHERE userid = %s"
 
     try:
@@ -875,18 +875,19 @@ def banUser():
             maxBidAuction = cur.fetchall()[0]
 
             if  maxValueUser < maxBidAuction: #invalidar todas as licitacoes entre estes 2 valores e colocar a maior licitacao com o valor do user a banir
-                sqlQuery = "UPDATE licitacao SET valida = "\
-                                        "CASE " \
-                                            "WHEN valor = %s THEN true " \
-                                            "WHEN valor >= %s AND valor < %s THEN false " \
-                                            "ELSE true "\
-                                        "END, " \
-                                    "valor = "\
-                                        "CASE " \
-                                            "WHEN valor = %s THEN %s "\
-                                            "ELSE valor " \
-                                        "END "\
-                            "WHERE leilao_leilaoid = %s"
+                sqlQuery = "UPDATE licitacao SET valida = " \
+                           "CASE " \
+                           "WHEN valida = false THEN false " \
+                           "WHEN valor = %s THEN true " \
+                           "WHEN valor >= %s AND valor < %s THEN false " \
+                           "ELSE true " \
+                           "END, " \
+                           "valor = " \
+                           "CASE " \
+                           "WHEN valor = %s THEN %s " \
+                           "ELSE valor " \
+                           "END " \
+                           "WHERE leilao_leilaoid = %s"
 
                 values = (maxBidAuction, maxValueUser, maxBidAuction, maxBidAuction, maxValueUser, leilaoID)
                 try:
