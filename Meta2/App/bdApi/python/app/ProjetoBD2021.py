@@ -870,12 +870,12 @@ def banUser():
             leilaoID = row[0]
             logger.debug(f'LEILAO ID: {leilaoID}, TYPE: {type(leilaoID)}')
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s and valida = true"
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s"
             sqlValues = (userID, leilaoID)
             cur.execute(sqlQuery, sqlValues)
             maxValueUser = cur.fetchall()[0]
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s and valida = true"
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s"
             cur.execute(sqlQuery, [leilaoID])
             maxBidAuction = cur.fetchall()[0]
 
@@ -953,24 +953,39 @@ def banUser():
                 conn.close()
                 return jsonify(erro=codigoErro)
 
-            comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
-            sqlQuery = "INSERT INTO notificacao (comentario, momento, leilao_leilaoid, utilizador_userid) "\
-                        "SELECT DISTINCT %s, NOW(), %s ,comprador_utilizador_userid " \
-                       "FROM licitacao WHERE leilao_leilaoid = %s"
 
-            values = (comentario, leilaoID, leilaoID)
-            try:
-                cur.execute(sqlQuery, values)
-                #cur.execute("commit")
-            except (Exception, psycopg2.DatabaseError) as error:
-                logger.error(error)
-                sucess = False
-                codigoErro = '999'  # Erro nao identificado
-                cur.execute("rollback")
-                conn.close()
-                return jsonify(erro=codigoErro)
-
-            # else: NAO E PRECISO FAZER NADA PQ A LICITACAO DO USER E MAXIMA ENTAO CONTA A SEGUNDA MELHOR
+            # NOTIFICACAO ANTIGA !!
+            # comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
+            # sqlQuery = "INSERT INTO notificacao (comentario, momento, leilao_leilaoid, utilizador_userid) "\
+            #             "SELECT DISTINCT %s, NOW(), %s ,comprador_utilizador_userid " \
+            #            "FROM licitacao WHERE leilao_leilaoid = %s"
+            #
+            # values = (comentario, leilaoID, leilaoID)
+            # try:
+            #     cur.execute(sqlQuery, values)
+            #     #cur.execute("commit")
+            # except (Exception, psycopg2.DatabaseError) as error:
+            #     logger.error(error)
+            #     sucess = False
+            #     codigoErro = '999'  # Erro nao identificado
+            #     cur.execute("rollback")
+            #     conn.close()
+            #     return jsonify(erro=codigoErro)
+        comentario = f"Utilizador {userID} foi banido do leilao {leilaoID}"
+        sqlQuery = "INSERT INTO notificacao (utilizador_userid, momento, leilao_leilaoid, comentario) " \
+                    "SELECT DISTINCT comprador_utilizador_userid, (NOW() + INTERVAL '1 hours'), leilao_leilaoid, %s "\
+                    "FROM licitacao "\
+                    "WHERE leilao_leilaoid IN (SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s)"
+        try:
+            cur.execute(sqlQuery, (comentario, userID, ))
+            #cur.execute("commit")
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(error)
+            sucess = False
+            codigoErro = '999'  # Erro nao identificado
+            cur.execute("rollback")
+            conn.close()
+            return jsonify(erro=codigoErro)
 
     try:
         sucess = True
