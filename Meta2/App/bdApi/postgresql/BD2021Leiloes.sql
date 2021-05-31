@@ -94,7 +94,7 @@ as $$
 BEGIN
 	-- Envia notificacoes
 	INSERT INTO notificacao(comentario, momento, leilao_leilaoid, utilizador_userid)
-	SELECT 'Licitacao ultrapassada pelo user '||new.comprador_utilizador_userid||', com o valor de '||new.valor, NOW() + INTERVAL '1 hours', new.leilao_leilaoid, comprador_utilizador_userid
+	SELECT DISTINCT ON (comprador_utilizador_userid) 'Licitacao ultrapassada pelo user '||new.comprador_utilizador_userid||', com o valor de '||new.valor, NOW() + INTERVAL '1 hours', new.leilao_leilaoid, comprador_utilizador_userid
 	FROM licitacao
 	WHERE comprador_utilizador_userid != new.comprador_utilizador_userid
 		AND valor < new.valor
@@ -136,7 +136,7 @@ as $$
 BEGIN
 	-- Envia notificacoes
 	INSERT INTO notificacao(comentario, momento, leilao_leilaoid, utilizador_userid)
-	SELECT DISTINCT on (comprador_utilizador_userid) 'Lamentamos, mas o leilao '||old.titulo||' foi cancelado pelo admin userid:'||new.admincancelou||'. Pelo que as licitacoes terminaram e nao ha vencedor!', NOW() + INTERVAL '1 hours', old.leilaoid, comprador_utilizador_userid
+	SELECT DISTINCT ON (comprador_utilizador_userid) 'Lamentamos, mas o leilao '||old.titulo||' foi cancelado pelo admin userid:'||new.admincancelou||'. Pelo que as licitacoes terminaram e nao ha vencedor!', NOW() + INTERVAL '1 hours', old.leilaoid, comprador_utilizador_userid
 	FROM licitacao
 	WHERE leilao_leilaoid = old.leilaoid AND valida = true;
     RETURN new;
