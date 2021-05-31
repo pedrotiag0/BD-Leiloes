@@ -870,12 +870,12 @@ def banUser():
             leilaoID = row[0]
             logger.debug(f'LEILAO ID: {leilaoID}, TYPE: {type(leilaoID)}')
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s"
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE comprador_utilizador_userid = %s and leilao_leilaoid = %s and valida = true"
             sqlValues = (userID, leilaoID)
             cur.execute(sqlQuery, sqlValues)
             maxValueUser = cur.fetchall()[0]
 
-            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s"
+            sqlQuery = "SELECT MAX(valor) FROM licitacao WHERE leilao_leilaoid = %s and valida = true"
             cur.execute(sqlQuery, [leilaoID])
             maxBidAuction = cur.fetchall()[0]
 
