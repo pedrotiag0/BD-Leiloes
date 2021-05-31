@@ -75,7 +75,7 @@ def addUser():
         if conn is not None:
             conn.close()
     if (sucess):
-        return jsonify(userId=novoUserId)
+        return jsonify(userId=int(novoUserId))
     else:
         return jsonify(erro=codigoErro)
 
