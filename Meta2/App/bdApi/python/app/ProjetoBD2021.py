@@ -858,8 +858,8 @@ def banUser():
 
     if affected_rows == 0: #Significa que o user nao tinha licitacoes
         codigoErro = '019'
-        conn.close()
-        return jsonify(erro=codigoErro)
+        #conn.close()
+        #return jsonify(erro=codigoErro)
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
         sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s FOR UPDATE"
@@ -909,6 +909,17 @@ def banUser():
                 values = (maxValueUser, leilaoID)
                 try:
                     cur.execute(sql, values)
+                    cur.execute("commit")
+                except (Exception, psycopg2.DatabaseError) as error:
+                    logger.error(error)
+                    codigoErro = '999'
+                    cur.execute("rollback")
+                    conn.close()
+                    return jsonify(erro=codigoErro)
+            else: # Vai atualizar o valor da licitacao maxima
+                sql = "UPDATE leilao SET maiorlicitacao = (SELECT MAX(valor) FROM licitacao WHERE valida = true) WHERE leilaoid = %s"
+                try:
+                    cur.execute(sql, (leilaoID, ))
                     cur.execute("commit")
                 except (Exception, psycopg2.DatabaseError) as error:
                     logger.error(error)
