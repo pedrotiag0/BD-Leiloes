@@ -740,7 +740,8 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             conn.close()
 
         if sucess:
-            return jsonify(payload)
+            content = {'leilaoId': leilao_leilaoid, 'Novo titulo': newTitle, 'Nova descricao': newDescription}
+            return content
         else:
             return jsonify(erro=codigoErro)
 
