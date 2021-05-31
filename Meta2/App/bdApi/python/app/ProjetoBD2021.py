@@ -862,7 +862,7 @@ def banUser():
         #return jsonify(erro=codigoErro)
     else: #Significa que o user tinha licitacoes
         # E preciso obter o valor da licitacao max do user de todos os leiloes
-        sql = "SELECT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s FOR UPDATE"
+        sql = "SELECT DISTINCT leilao_leilaoid FROM licitacao WHERE comprador_utilizador_userid = %s "
         cur.execute(sql, (userID, ))
         rows = cur.fetchall()
 
