@@ -643,9 +643,6 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
         codigoErro = '003'  # NAO E NUMERO
         return jsonify(erro=codigoErro)
 
-    conn = db_connection()
-    cur = conn.cursor()
-
     # Verifica se se trata do dono deste leilao
     vendedorId = getVendedorIdByAuthCode(authCode)  # Verifica se se trata de um vendedor registado
     if (vendedorId[0] == None):
@@ -684,12 +681,20 @@ def alteraPropriedadeLeilao(leilao_leilaoid):
             conn.close()
             return jsonify(erro=codigoErro)
 
-        newTitle = payload['novoTitulo']
-        newDescription = payload['novaDescricao']
         for row in rows:
             leilaoID = int(row[0])
             currentTitle = row[1]
             currentDescription = row[2]
+
+        try:
+            newTitle = payload['novoTitulo']
+        except Exception:
+            newTitle = currentTitle
+
+        try:
+            newDescription = payload['novaDescricao']
+        except Exception:
+            newDescription = currentDescription
 
         if not ((64 >= len(newTitle) > 1) and 512 >= len(newDescription) > 1):
             codigoErro = '002'  # Input Invalido
