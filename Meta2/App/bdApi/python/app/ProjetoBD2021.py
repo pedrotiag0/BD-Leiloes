@@ -1174,7 +1174,7 @@ def get_inbox():
     conn = db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT leilao_leilaoid, comentario, momento FROM notificacao WHERE utilizador_userid = %s", (userId,))
+    cur.execute("SELECT leilao_leilaoid, comentario, momento FROM notificacao WHERE utilizador_userid = %s ORDER BY momento DESC", (userId,))
     rows = cur.fetchall()
     payload = []
     for row in rows:
