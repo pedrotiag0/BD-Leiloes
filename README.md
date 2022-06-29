@@ -2,7 +2,9 @@
 Trabalho realizado no âmbito da disciplina de Base de Dados no 2º Semestre de 2021
 
 Diogo Filipe
+
 José Gomes
+
 Pedro Tiago
 
 Tecnologias utilizadas:
