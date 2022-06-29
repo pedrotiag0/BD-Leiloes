@@ -1,5 +1,9 @@
 # BD-Leilões
-Trabalho realizado no âmbito da disciplina de Base de Dados no 2º Semestre de 2021 juntamente com os meus colegas Pedro Tiago e Diogo Filipe
+Trabalho realizado no âmbito da disciplina de Base de Dados no 2º Semestre de 2021
+
+Diogo Filipe
+José Gomes
+Pedro Tiago
 
 Tecnologias utilizadas:
 <p align="left"> <a href="https://www.docker.com/" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original-wordmark.svg" alt="docker" width="40" height="40"/> </a> 
